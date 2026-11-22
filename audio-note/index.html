@@ -257,6 +257,14 @@
     .seg-btn .seg-title { font-size: 13.5px; font-weight: 650; }
     .seg-btn .seg-sub { font-size: 10.5px; font-family: var(--mono); opacity: 0.8; }
     .seg-btn.active .seg-title { color: var(--accent-ink); }
+    .seg-speed { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .seg-speed .seg-btn { font-family: var(--mono); font-size: 12px; }
+    .range { -webkit-appearance: none; appearance: none; width: 100%; height: 30px; background: transparent; padding: 0; }
+    .range::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); }
+    .range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; margin-top: -8px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); box-shadow: 0 1px 3px rgba(16, 24, 40, 0.25); }
+    .range::-moz-range-track { height: 6px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); }
+    .range::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); }
+    .range:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 999px; }
 
     /* keys */
     .key-form { display: flex; gap: 7px; align-items: stretch; }
@@ -587,6 +595,7 @@
           <span class="settings-title">설정</span>
           <span class="settings-sums">
             <span class="chip warn" id="sumKeys">API 키 없음</span>
+            <span class="chip quiet" id="sumSpeed" hidden>1.5x 배속</span>
             <span class="chip quiet" id="sumModels">빠름 · GPT-OSS 120B</span>
           </span>
           <svg class="ic ic-sm settings-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9.5l6 6 6-6"></path></svg>
@@ -638,6 +647,19 @@
                   </button>
                 </div>
                 <p class="note">선택한 모델이 한도(429)에 걸리면 파일마다 다른 모델로 자동 전환해 이어서 받아쓰고, 해당 카드에 표시합니다.</p>
+
+                <div class="label-row" style="margin-top:13px">
+                  <label class="field-label" for="speedRange">음성 배속 (실제 강의 가속)</label>
+                  <span class="chip" id="speedChip">1.0x</span>
+                </div>
+                <input class="range" type="range" id="speedRange" min="1" max="2" step="0.05" value="1" aria-describedby="speedNote" />
+                <div class="seg seg-speed" id="speedSeg" role="group" aria-label="배속 빠른 선택">
+                  <button class="seg-btn active" type="button" data-speed="1" aria-pressed="true">1.0x</button>
+                  <button class="seg-btn" type="button" data-speed="1.25" aria-pressed="false">1.25x</button>
+                  <button class="seg-btn" type="button" data-speed="1.5" aria-pressed="false">1.5x</button>
+                  <button class="seg-btn" type="button" data-speed="2" aria-pressed="false">2.0x</button>
+                </div>
+                <p class="note" id="speedNote" style="margin-top:7px">배속을 올리면 소리를 먼저 빠르게 만든 뒤 받아쓰기합니다(음이 조금 높아짐). 25MB를 넘으면 배속 후 10분 단위로 나누어 처리합니다.</p>
 
                 <div style="height:12px"></div>
                 <label class="field-label" for="chatModel">요약 모델</label>
@@ -715,14 +737,14 @@
           </span>
           <span class="drop-title">오디오 파일 선택</span>
           <span class="drop-meta">여러 개를 한 번에 · 끌어다 놓아도 됩니다</span>
-          <span class="drop-meta">m4a, mp3, wav, ogg, webm, flac</span>
+          <span class="drop-meta">m4a, mp3, wav, ogg, webm, flac · 25MB 초과도 자동 분할</span>
         </div>
         <input type="file" id="fileInput" accept="audio/*,.m4a,.mp3,.wav,.ogg,.webm,.mp4,.flac,.aac,.opus" multiple hidden />
 
         <ul class="file-list" id="fileList"></ul>
         <div class="file-tools" id="fileTools" hidden>
           <button class="link-btn" id="clearFilesBtn" type="button">목록 비우기</button>
-          <span class="chip" id="sizeHint">파일당 최대 25MB</span>
+          <span class="chip" id="sizeHint">파일당 25MB 초과는 자동 분할</span>
         </div>
 
         <div class="controls">
@@ -826,6 +848,11 @@
       var CHAT_FALLBACK = 'openai/gpt-oss-20b';
       var CHAT_FALLBACK2 = 'openai/gpt-oss-120b';
       var MAX_BYTES = 25 * 1024 * 1024;
+      /* 25MB를 넘는 파일은 16kHz 모노 16bit PCM WAV로 다시 인코딩해 나눈다.
+         16kHz x 1ch x 16bit = 32,000 bytes/s → 10분 = 19.2MB (항상 24MB 이하). */
+      var SPLIT_RATE = 16000;
+      var SPLIT_SECONDS = 600;
+      var SPLIT_MAX_BYTES = 24 * 1024 * 1024;
       var LS = {
         key: 'audio_note_api_key',
         keys: 'audio_note_keys',
@@ -837,6 +864,7 @@
         outLang: 'audio_note_out_lang',
         mode: 'audio_note_mode',
         custom: 'audio_note_custom_prompt',
+        speed: 'audio_note_speed',
         settings: 'audio_note_settings_open',
         quota: 'audio_note_quota',
         usage: 'audio_note_usage'
@@ -858,6 +886,7 @@
       var toggleAllBtn = $('toggleAllBtn'), toggleAllLabel = $('toggleAllLabel');
       var settingsCard = $('settingsCard'), settingsToggle = $('settingsToggle'), settingsBtn = $('settingsBtn');
       var sumKeys = $('sumKeys'), sumModels = $('sumModels');
+      var speedRange = $('speedRange'), speedSeg = $('speedSeg'), speedChip = $('speedChip'), sumSpeed = $('sumSpeed');
       var progressWrap = $('progress'), progressText = $('progressText'), progressPct = $('progressPct');
       var progressFill = $('progressFill'), etaValue = $('etaValue');
       var quotaChip = $('quotaChip');
@@ -866,6 +895,7 @@
       var items = [];
       var seq = 0;
       var sttChoice = 'turbo';
+      var speedValue = 1;
       var busy = false;
       var allCollapsed = false;
       var settingsOpen = false;
@@ -1016,7 +1046,12 @@
       function itemFraction(it) {
         if (it.status === 'done' || it.status === 'skipped' || it.status === 'error') return 1;
         if (it.status === 'summarizing') return 0.72;
-        if (it.status === 'transcribing') return 0.32;
+        if (it.status === 'transcribing') {
+          if (it.splitTotal > 1 && it.splitIndex > 0) {
+            return 0.04 + 0.28 * ((it.splitIndex - 1) / it.splitTotal);
+          }
+          return 0.32;
+        }
         return 0;
       }
       function fmtDur(sec) {
@@ -1166,6 +1201,36 @@
           sumKeys.classList.toggle('warn', keys.length === 0);
         }
         if (sumModels) sumModels.textContent = STT[sttChoice].name + ' · ' + prettyModel(chatModel.value);
+        renderSpeed();
+      }
+
+      /* ---------- speed (1.0x ~ 2.0x) ---------- */
+      function fmtSpeed(v) {
+        var s = Math.round(v * 100) / 100;
+        return (s % 1 === 0 ? s.toFixed(1) : String(s)) + 'x';
+      }
+      function renderSpeed() {
+        if (speedRange) speedRange.value = String(speedValue);
+        if (speedChip) speedChip.textContent = fmtSpeed(speedValue);
+        if (speedSeg) {
+          Array.prototype.forEach.call(speedSeg.querySelectorAll('.seg-btn'), function (btn) {
+            var on = Math.abs(parseFloat(btn.getAttribute('data-speed')) - speedValue) < 0.001;
+            btn.classList.toggle('active', on);
+            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+          });
+        }
+        if (sumSpeed) {
+          var active = speedValue > 1.0001;
+          sumSpeed.hidden = !active;
+          if (active) sumSpeed.textContent = fmtSpeed(speedValue) + ' 배속';
+        }
+      }
+      function setSpeed(v, persist) {
+        var n = parseFloat(v);
+        if (isNaN(n)) n = 1;
+        speedValue = Math.min(2, Math.max(1, Math.round(n * 100) / 100));
+        if (persist) write(LS.speed, String(speedValue));
+        renderSpeed();
       }
       function addKeysFromText(text) {
         var parts = String(text).split(/[\s,]+/);
@@ -1238,6 +1303,15 @@
       var savedChat = read(LS.chat);
       if (savedChat && chatModel.querySelector('option[value="' + savedChat + '"]')) chatModel.value = savedChat;
       chatModel.addEventListener('change', function () { write(LS.chat, chatModel.value); renderSettingsSummary(); });
+
+      var savedSpeed = parseFloat(read(LS.speed));
+      setSpeed(isNaN(savedSpeed) ? 1 : savedSpeed, false);
+      speedRange.addEventListener('input', function () { setSpeed(speedRange.value, true); });
+      speedSeg.addEventListener('click', function (e) {
+        var btn = e.target.closest ? e.target.closest('.seg-btn') : null;
+        if (!btn) return;
+        setSpeed(btn.getAttribute('data-speed'), true);
+      });
 
       var savedLang = read(LS.lang);
       if (savedLang !== null && langSelect.querySelector('option[value="' + savedLang + '"]')) langSelect.value = savedLang;
@@ -1371,6 +1445,9 @@
           size: file.size,
           base: baseName(file.name),
           big: file.size > MAX_BYTES,
+          splitTotal: 0,
+          splitIndex: 0,
+          speed: 0,
           status: 'pending',
           error: '',
           transcript: '',
@@ -1390,7 +1467,13 @@
       }
       function statusTextOf(it) {
         if (it.status === 'pending') return '대기';
-        if (it.status === 'transcribing') return '받아쓰기 중';
+        if (it.status === 'transcribing') {
+          if (it.splitTotal > 1 && it.splitIndex > 0) {
+            return '분할 받아쓰기 (' + Math.min(it.splitIndex, it.splitTotal) + '/' + it.splitTotal + ')';
+          }
+          if (it.speed > 1.0001) return it.splitIndex ? '배속 받아쓰기 중' : '배속 준비 중';
+          return it.big ? '분할 준비 중' : '받아쓰기 중';
+        }
         if (it.status === 'summarizing') return '정리 중';
         if (it.status === 'done') return '완료';
         if (it.status === 'skipped') return '건너뜀';
@@ -1476,14 +1559,14 @@
           li.innerHTML =
             '<svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V6l9-2v12"></path><circle cx="6.5" cy="18" r="2.5"></circle><circle cx="15.5" cy="16" r="2.5"></circle></svg>' +
             '<span class="fname" title="' + escapeHtml(it.name) + '">' + escapeHtml(it.name) + '</span>' +
-            '<span class="fsize">' + humanSize(it.size) + (it.big ? ' · 25MB 초과' : '') + '</span>' +
+            '<span class="fsize">' + humanSize(it.size) + (it.big ? ' · 25MB 초과 · 자동 분할' : '') + '</span>' +
             '<button class="icon-btn sm" type="button" data-remove="' + it.id + '" aria-label="' + escapeHtml(it.name) + ' 목록에서 빼기">' +
             '<svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>';
           fileList.appendChild(li);
         });
         fileTools.hidden = items.length === 0;
         var bigCount = items.filter(function (it) { return it.big; }).length;
-        fileCountChip.textContent = items.length + '개 선택' + (bigCount ? ' · 25MB 초과 ' + bigCount : '');
+        fileCountChip.textContent = items.length + '개 선택' + (bigCount ? ' · 25MB 초과 ' + bigCount + '개 자동 분할' : '');
       }
 
       /* ---------- buttons / status ---------- */
@@ -1552,7 +1635,7 @@
       }
       function friendlyError(res, what) {
         if (res.status === 401) return Promise.resolve(what + ' 실패: API 키가 올바르지 않습니다. Groq 콘솔에서 키를 다시 확인해 주세요.');
-        if (res.status === 413) return Promise.resolve(what + ' 실패: 파일이 너무 큽니다. 25MB 아래로 나누어 주세요.');
+        if (res.status === 413) return Promise.resolve(what + ' 실패: 파일이 너무 큽니다. 잠시 후 다시 시도하거나 파일을 나누어 주세요.');
         return errorDetail(res).then(function (detail) {
           return what + ' 실패 (' + res.status + ')' + (detail ? ' — ' + detail : '');
         });
@@ -1585,8 +1668,259 @@
         });
       }
 
+      /* ---------- 25MB 초과: 디코딩 → 16kHz 모노 WAV 청크 ---------- */
+      function decodeMessage(err) {
+        var name = err && err.name ? String(err.name) : '';
+        var msg = (err && err.message) || '';
+        if (name === 'RangeError' || /allocation|out of memory|memory/i.test(msg)) {
+          return new Error('파일이 너무 커서 폰 메모리로 나누지 못했습니다. 파일을 나누어 올리거나 용량을 줄여 주세요.');
+        }
+        return new Error('이 파일을 브라우저에서 열지 못해 자동 분할을 못 했습니다. 파일을 나누어 올리거나 mp3·m4a로 다시 저장해 주세요.');
+      }
+      function decodeAudioFile(file) {
+        return new Promise(function (resolve, reject) {
+          var Ctx = window.AudioContext || window.webkitAudioContext;
+          if (!Ctx) {
+            reject(new Error('이 브라우저에서는 자동 분할을 지원하지 않습니다. 파일을 나누어 올려 주세요.'));
+            return;
+          }
+          /* sampleRate를 지정해 디코딩하면 브라우저가 바로 16kHz로 다시 샘플링해 메모리를 아낀다. */
+          var ctx = null;
+          try { ctx = new Ctx({ sampleRate: SPLIT_RATE }); } catch (e) { ctx = null; }
+          if (!ctx) {
+            try { ctx = new Ctx(); } catch (e2) {
+              reject(new Error('이 브라우저에서는 자동 분할을 지원하지 않습니다. 파일을 나누어 올려 주세요.'));
+              return;
+            }
+          }
+          var closed = false;
+          function close() {
+            if (closed) return;
+            closed = true;
+            try { if (ctx && ctx.close) ctx.close(); } catch (e) { /* ignore */ }
+          }
+          var reader = new FileReader();
+          reader.onerror = function () {
+            close();
+            reject(new Error('파일을 읽지 못했습니다. 다시 시도해 주세요.'));
+          };
+          reader.onload = function () {
+            var buf = reader.result;
+            var p = null;
+            try { p = ctx.decodeAudioData(buf); } catch (e) { p = null; }
+            if (!p || typeof p.then !== 'function') {
+              p = new Promise(function (res, rej) {
+                try { ctx.decodeAudioData(buf, res, rej); } catch (e) { rej(e); }
+              });
+            }
+            p.then(function (audio) {
+              buf = null;
+              resolve({ audio: audio, close: close });
+            }, function (err) {
+              close();
+              reject(decodeMessage(err));
+            });
+          };
+          reader.readAsArrayBuffer(file);
+        });
+      }
+      /* 배속: 16kHz 모노 OfflineAudioContext에서 playbackRate로 소리를 먼저 빠르게 만든다. */
+      function renderAtSpeed(audio, speed) {
+        return new Promise(function (resolve, reject) {
+          var Off = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+          if (!Off) {
+            reject(new Error('이 브라우저에서는 배속을 지원하지 않습니다. 배속을 1.0x로 바꾸거나 파일을 나누어 올려 주세요.'));
+            return;
+          }
+          var inRate = audio.sampleRate || SPLIT_RATE;
+          var dur = audio.length / inRate;
+          var len = Math.max(1, Math.ceil((dur / speed) * SPLIT_RATE));
+          var ctx;
+          try {
+            ctx = new Off(1, len, SPLIT_RATE);
+          } catch (e) {
+            reject(new Error('배속 처리를 시작하지 못했습니다. 배속을 1.0x로 바꾸거나 파일을 나누어 올려 주세요.'));
+            return;
+          }
+          try {
+            var src = ctx.createBufferSource();
+            src.buffer = audio;
+            src.playbackRate.value = speed;
+            src.connect(ctx.destination);
+            src.start(0);
+          } catch (e2) {
+            reject(new Error('배속 처리를 시작하지 못했습니다. 배속을 1.0x로 바꾸거나 파일을 나누어 올려 주세요.'));
+            return;
+          }
+          var p = ctx.startRendering();
+          if (!p || typeof p.then !== 'function') {
+            reject(new Error('배속 처리를 마치지 못했습니다. 배속을 1.0x로 바꾸거나 파일을 나누어 올려 주세요.'));
+            return;
+          }
+          p.then(function (buf) { resolve(buf); }, function () {
+            reject(new Error('배속 처리를 마치지 못했습니다. 배속을 1.0x로 바꾸거나 파일을 나누어 올려 주세요.'));
+          });
+        });
+      }
+      function wavHeader(dataBytes) {
+        var buf = new ArrayBuffer(44);
+        var v = new DataView(buf);
+        function str(off, s) {
+          for (var i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i));
+        }
+        str(0, 'RIFF');
+        v.setUint32(4, 36 + dataBytes, true);
+        str(8, 'WAVE');
+        str(12, 'fmt ');
+        v.setUint32(16, 16, true);
+        v.setUint16(20, 1, true);                 // PCM
+        v.setUint16(22, 1, true);                 // mono
+        v.setUint32(24, SPLIT_RATE, true);
+        v.setUint32(28, SPLIT_RATE * 2, true);    // byte rate
+        v.setUint16(32, 2, true);                 // block align
+        v.setUint16(34, 16, true);                // bits per sample
+        str(36, 'data');
+        v.setUint32(40, dataBytes, true);
+        return buf;
+      }
+      /* [startOut, endOut) 구간을 16kHz 모노 16bit PCM WAV Blob으로 만든다. UI가 멈추지 않도록 조금씩 나누어 돈다. */
+      function encodeWavChunk(audio, startOut, endOut) {
+        return new Promise(function (resolve, reject) {
+          var inRate = audio.sampleRate || SPLIT_RATE;
+          var ratio = inRate / SPLIT_RATE;
+          var chCount = Math.max(1, Math.min(2, audio.numberOfChannels || 1));
+          var chans = [];
+          for (var c = 0; c < chCount; c++) chans.push(audio.getChannelData(c));
+          var frames = audio.length;
+          var total = Math.max(0, endOut - startOut);
+          var pcm;
+          try {
+            pcm = new Int16Array(total);
+          } catch (e) {
+            reject(new Error('파일이 너무 커서 폰 메모리로 나누지 못했습니다. 파일을 나누어 올리거나 용량을 줄여 주세요.'));
+            return;
+          }
+          var win = ratio > 1.001 ? Math.max(1, Math.round(ratio)) : 0;
+          var i = 0;
+          var SLICE = 120000;
+          function step() {
+            var limit = Math.min(total, i + SLICE);
+            for (; i < limit; i++) {
+              var base = (startOut + i) * ratio;
+              var sum = 0, cnt = 0, j, ch, idx, v;
+              if (!win) {
+                idx = base | 0;
+                if (idx >= frames) idx = frames - 1;
+                for (ch = 0; ch < chCount; ch++) sum += chans[ch][idx];
+                cnt = chCount;
+              } else {
+                var from = Math.round(base - win / 2);
+                for (j = 0; j < win; j++) {
+                  idx = from + j;
+                  if (idx < 0 || idx >= frames) continue;
+                  for (ch = 0; ch < chCount; ch++) sum += chans[ch][idx];
+                  cnt += chCount;
+                }
+              }
+              if (!cnt) { pcm[i] = 0; continue; }
+              v = sum / cnt;
+              pcm[i] = v >= 1 ? 32767 : v <= -1 ? -32768 : (v < 0 ? v * 32768 : v * 32767) | 0;
+            }
+            if (i < total) { setTimeout(step, 0); return; }
+            resolve(new Blob([wavHeader(total * 2), pcm], { type: 'audio/wav' }));
+          }
+          step();
+        });
+      }
+
+      /* 25MB 초과 또는 배속: 디코딩 → (배속) → 16kHz 모노 WAV 한 개 또는 10분 청크들 → 순서대로 받아쓰기 */
+      function transcribeSplit(ks, it, lang, speed) {
+        var cleanup = function () {};
+        var texts = [];
+        var silent = 0;
+        it.status = 'transcribing';
+        it.splitIndex = 0;
+        it.splitTotal = 0;
+        setStatus((speed > 1.0001 ? '배속·' : '') + '나누는 준비 중 · ' + it.name, true, false);
+        updateCard(it);
+
+        var work = decodeAudioFile(it.file).then(function (dec) {
+          cleanup = dec.close;
+          var decoded = dec.audio;
+          var ready;
+          if (speed > 1.0001) {
+            setStatus('배속 적용 중 · ' + it.name + ' · ' + fmtSpeed(speed), true, false);
+            ready = renderAtSpeed(decoded, speed);
+          } else {
+            ready = Promise.resolve(decoded);
+          }
+          return ready.then(function (audio) {
+            var inRate = audio.sampleRate || SPLIT_RATE;
+            var outLen = Math.round((audio.length / inRate) * SPLIT_RATE);
+            if (!outLen) throw new Error('오디오 길이를 읽지 못해 자동 분할을 못 했습니다. 파일을 나누어 올려 주세요.');
+            var perMax = Math.floor((SPLIT_MAX_BYTES - 44) / 2);
+            var per = Math.min(SPLIT_SECONDS * SPLIT_RATE, perMax);
+            var parts = Math.max(1, Math.ceil(outLen / per));
+            it.splitTotal = parts;
+            updateCard(it);
+            function step(i) {
+              if (i >= parts) return Promise.resolve(texts);
+              it.splitIndex = i + 1;
+              updateCard(it);
+              var start = i * per;
+              var stop = Math.min(outLen, start + per);
+              var tag = parts > 1 ? '분할 받아쓰기 (' + (i + 1) + '/' + parts + ')' : '받아쓰기';
+              setStatus((speed > 1.0001 ? fmtSpeed(speed) + ' 배속 · ' : '') + '나누는 중 · ' + it.name + ' (' + (i + 1) + '/' + parts + ')', true, false);
+              return encodeWavChunk(audio, start, stop).then(function (blob) {
+                var name = (parts > 1 ? it.base + '-part' + (i + 1) + 'of' + parts : it.base) + '.wav';
+                var chunk = new File([blob], name, { type: 'audio/wav', lastModified: Date.now() });
+                return transcribe(ks, it, lang, {
+                  file: chunk,
+                  seconds: (stop - start) / SPLIT_RATE,
+                  label: tag,
+                  allowEmpty: true
+                }).then(function (text) {
+                  if (text) texts.push(text); else silent += 1;
+                  return step(i + 1);
+                });
+              });
+            }
+            return step(0);
+          });
+        });
+
+        return work.then(function (texts) {
+          cleanup();
+          if (!texts.length) {
+            throw new Error('음성을 인식하지 못했습니다. 이 파일에서 말소리를 찾지 못했으니 다른 녹음을 확인해 주세요.');
+          }
+          if (it.splitTotal > 1) {
+            addNotice(it.name + ': 25MB를 넘어 ' + it.splitTotal + '개 구간으로 나누어 받아쓰기한 뒤 하나로 합쳤습니다.');
+          }
+          if (silent) {
+            addNotice(it.name + ': 구간 ' + silent + '개에서는 음성을 인식하지 못했습니다.');
+          }
+          it.splitIndex = it.splitTotal;
+          return texts.join('\n\n');
+        }, function (err) {
+          cleanup();
+          /* 일부 구간이라도 받아쓰기했으면 그 텍스트는 남긴다. */
+          if (texts.length) {
+            it.transcript = texts.join('\n\n');
+            it.tab = 'transcript';
+            err.message = err.message + ' (' + texts.length + '/' + (it.splitTotal || '?') + '개 구간까지 받아쓰기한 텍스트만 남겼습니다.)';
+          }
+          throw err;
+        });
+      }
+
       /* ---------- transcribe with per-file 429 fallback ---------- */
-      function transcribe(ks, it, lang) {
+      /* opts: { file, seconds, label, allowEmpty } — 분할 청크는 청크 파일을 file로 넘긴다. */
+      function transcribe(ks, it, lang, opts) {
+        opts = opts || {};
+        var upload = opts.file || it.file;
+        var seconds = opts.seconds || 0;
+        var label = opts.label || '받아쓰기';
         var models = sttChoice === 'turbo' ? ['turbo', 'large'] : ['large', 'turbo'];
 
         function attemptKey(ki) {
@@ -1601,9 +1935,9 @@
             it.status = 'transcribing';
             it.error = '';
             updateCard(it);
-            setStatus('받아쓰기 중 · ' + it.name + ' · ' + model.name + (ks.length > 1 ? ' · ' + keyInfo.num + '번 키' : ''), true, false);
+            setStatus(label + ' 중 · ' + it.name + ' · ' + model.name + (ks.length > 1 ? ' · ' + keyInfo.num + '번 키' : ''), true, false);
 
-            return sttRequest(keyInfo.value, it.file, model.id, lang).then(function (res) {
+            return sttRequest(keyInfo.value, upload, model.id, lang).then(function (res) {
               noteRateLimit(keyInfo, res, model.name);
               if (res.status === 429) return attemptModel(mi + 1);
               if (!res.ok) {
@@ -1611,11 +1945,14 @@
               }
               return res.json().then(function (data) {
                 var text = (data && data.text ? data.text : '').trim();
-                if (!text) throw new Error('음성을 인식하지 못했습니다. 이 파일을 건너뛰고 다른 녹음을 확인해 주세요.');
+                if (!text) {
+                  if (opts.allowEmpty) return '';
+                  throw new Error('음성을 인식하지 못했습니다. 이 파일을 건너뛰고 다른 녹음을 확인해 주세요.');
+                }
                 it.sttUsed = models[mi];
                 it.sttFallback = mi > 0;
                 it.keyNum = keyInfo.num;
-                recordUsage(keyInfo.value, 'stt', it.duration || it.size / 2000);
+                recordUsage(keyInfo.value, 'stt', seconds || it.duration || it.size / 2000);
                 renderQuotaChip();
                 if (ks.length > 1) noteKeySwitch(keyInfo);
                 if (mi > 0) {
@@ -1802,6 +2139,8 @@
 
         var badge = '<span class="badge ' + statusClass(it) + '"><span class="dot"></span>' + statusTextOf(it) + '</span>';
         var metaParts = [humanSize(it.size)];
+        if (it.speed > 1.0001) metaParts.push(fmtSpeed(it.speed) + ' 배속');
+        if (it.splitTotal > 1) metaParts.push('분할 ' + it.splitTotal + '개');
         if (it.duration > 0) metaParts.push(fmtDur(it.duration));
         if (it.sttUsed) {
           metaParts.push('받아쓰기 ' + STT[it.sttUsed].name + ' (' + STT[it.sttUsed].short + ')' +
@@ -2072,6 +2411,27 @@
       }
 
       /* ---------- processing ---------- */
+      function finishItem(it, mode, text) {
+        it.transcript = text;
+        if (mode === 'raw') {
+          it.tab = 'transcript';
+          it.status = 'done';
+          updateCard(it);
+          return Promise.resolve();
+        }
+        it.status = 'summarizing';
+        it.tab = 'summary';
+        updateCard(it);
+        setStatus('정리 중 · ' + it.name, true, false);
+        return askModel(keyOrder(), summaryPrompt(mode) + customDirective(), text, '정리하는').then(function (res) {
+          it.summary = res.text;
+          it.chatUsed = res.model;
+          it.chatKeyNum = res.keyNum;
+          it.status = 'done';
+          updateCard(it);
+        });
+      }
+
       function processItem(it) {
         it.error = '';
         it.sttFallback = false;
@@ -2079,41 +2439,27 @@
         it.chatUsed = '';
         it.keyNum = 0;
         it.chatKeyNum = 0;
+        it.splitTotal = 0;
+        it.splitIndex = 0;
+        it.speed = 0;
         it.transcript = '';
         it.summary = '';
         it.notes = '';
         it.open = true;
 
-        if (it.big) {
-          it.status = 'skipped';
-          it.error = '25MB를 넘어 이 파일만 건너뛰었습니다. 나누어 올리거나 용량을 줄여 주세요.';
-          updateCard(it);
-          return Promise.resolve();
-        }
-
         var mode = modeChoice;
         var lang = langSelect.value;
+        var speed = speedValue;
+        it.speed = speed;
 
-        return transcribe(keyOrder(), it, lang).then(function (text) {
-          it.transcript = text;
-          if (mode === 'raw') {
-            it.tab = 'transcript';
-            it.status = 'done';
-            updateCard(it);
-            return null;
-          }
-          it.status = 'summarizing';
-          it.tab = 'summary';
-          updateCard(it);
-          setStatus('정리 중 · ' + it.name, true, false);
-          return askModel(keyOrder(), summaryPrompt(mode) + customDirective(), text, '정리하는').then(function (res) {
-            it.summary = res.text;
-            it.chatUsed = res.model;
-            it.chatKeyNum = res.keyNum;
-            it.status = 'done';
-            updateCard(it);
-            return null;
-          });
+        /* 배속 1.0x + 25MB 이하 → 원본 그대로 1회 호출.
+           배속이 있거나 25MB를 넘으면 디코딩해서 (배속 →) 16kHz 모노 WAV로 만들어 보낸다. */
+        var textPromise = (it.big || speed > 1.0001)
+          ? transcribeSplit(keyOrder(), it, lang, speed)
+          : transcribe(keyOrder(), it, lang);
+
+        return textPromise.then(function (text) {
+          return finishItem(it, mode, text);
         }).catch(function (err) {
           it.status = 'error';
           it.error = err.message;
