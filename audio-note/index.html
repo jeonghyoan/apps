@@ -309,14 +309,6 @@
       font-size: 10.5px; color: var(--muted); line-height: 1.4;
       overflow: hidden; text-overflow: ellipsis; white-space: normal;
     }
-    .key-role { flex: none; }
-    .role-select {
-      appearance: none; -webkit-appearance: none; cursor: pointer;
-      min-height: 28px; padding: 3px 22px 3px 7px; border-radius: 8px;
-      border: 1px solid var(--line-strong); background: var(--surface); color: var(--text);
-      font-family: inherit; font-size: 11px; font-weight: 620;
-    }
-    .key-role .chev { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; width: 12px; height: 12px; }
     .pipe-chips { display: inline-flex; gap: 5px; flex-wrap: wrap; }
 
     /* ---------- drop zone ---------- */
@@ -640,7 +632,7 @@
                 </div>
                 <ul class="key-list" id="keyList"></ul>
                 <p class="note">모든 키는 이 기기 브라우저의 localStorage에만 저장되고, 화면에는 끝 4자리만 보이도록 마스킹됩니다. 요청은 <code>api.groq.com</code>으로만 나갑니다.</p>
-                <p class="note">키마다 역할을 나누면 한 키는 전사만, 다른 키는 정리만 맡아 두 작업이 동시에 흘러갑니다. 역할을 정하지 않으면 첫 키는 전사, 두 번째 키는 정리로 자동 배정됩니다.</p>
+                <p class="note">키를 2개 이상 넣으면 파일을 키 수만큼 나눠 동시에 전사하고, 먼저 끝난 키가 남은 작업을 가져옵니다. 전사가 모두 끝나면 정리를 다시 나눠 병렬로 처리합니다.</p>
                 <p class="note">같은 Groq 계정의 키들은 한도를 공유하며, 다른 계정 키를 넣으면 한도 초과 시 자동 전환됩니다.</p>
               </div>
 
@@ -890,7 +882,6 @@
         mp3: 'mp3', aac: 'adts', flac: 'flac', wav: 'wav',
         ogg: 'ogg', oga: 'ogg', opus: 'ogg', webm: 'webm'
       };
-      var ROLE_NAME = { stt: '전사', chat: '정리', both: '둘 다' };
       var DEFAULT_COOL_SEC = 15;
       var LS = {
         key: 'audio_note_api_key',
@@ -904,7 +895,6 @@
         mode: 'audio_note_mode',
         custom: 'audio_note_custom_prompt',
         speed: 'audio_note_speed',
-        roles: 'audio_note_key_roles',
         settings: 'audio_note_settings_open',
         quota: 'audio_note_quota',
         usage: 'audio_note_usage'
@@ -1031,7 +1021,7 @@
           if (rec.quotas && typeof rec.quotas === 'object') k.quotas = rec.quotas;
         });
       }
-      function quotaLine(k, compact, roleTxt) {
+      function quotaLine(k, compact) {
         var q = k && k.quota, now = Date.now(), head = '';
         if (q && now - (q.at || 0) < 15 * 60 * 1000) {
           var parts = [];
@@ -1042,9 +1032,8 @@
         }
         var u = usageToday(k ? k.value : '');
         var usageTxt = '오늘 사용 ' + u.req + '건' + (u.sec >= 30 ? ' · ' + Math.max(1, Math.round(u.sec / 60)) + '분' : '');
-        var pre = roleTxt ? roleTxt + ' · ' : '';
-        if (head) return pre + (u.req > 0 ? head + (compact ? ' · 오늘 ' + u.req + '건' : ' · ' + usageTxt) : head);
-        return pre + usageTxt;
+        if (head) return u.req > 0 ? head + (compact ? ' · 오늘 ' + u.req + '건' : ' · ' + usageTxt) : head;
+        return usageTxt;
       }
       function renderQuotaChip() {
         if (!quotaChip) return;
@@ -1055,7 +1044,7 @@
         var low = !!(q && q.lim && q.rem != null && (Date.now() - (q.at || 0)) < 15 * 60 * 1000 && (q.rem / q.lim) < 0.1);
         quotaChip.classList.toggle('low', low);
         quotaChip.innerHTML = '<span class="dot"></span>' +
-          escapeHtml((keys.length > 1 ? (activeKey + 1) + '번 키 · ' : '') + quotaLine(k, true, roleName(activeKey)));
+          escapeHtml((keys.length > 1 ? (activeKey + 1) + '번 키 · ' : '') + quotaLine(k, true));
       }
       function noteRateLimit(keyInfo, res, modelLabel) {
         var h = res && res.headers;
@@ -1086,16 +1075,6 @@
       var runState = { total: 0, queue: [], startedMs: 0 };
       var EST_S_PER_MB = 0.9;
       function nowMs() { return (window.performance && window.performance.now) ? window.performance.now() : Date.now(); }
-      function itemFraction(it) {
-        if (it.status === 'done' || it.status === 'skipped' || it.status === 'error') return 1;
-        if (it.status === 'summarizing') return 0.82;
-        if (it.status === 'queued') return 0.62;
-        if (it.status === 'transcribing') {
-          if (it.splitTotal > 1) return Math.min(0.58, 0.58 * (it.splitIndex / it.splitTotal));
-          return 0.3;
-        }
-        return 0;
-      }
       function fmtDur(sec) {
         sec = Math.max(0, Math.round(sec));
         if (sec < 10) return '10초 안팎';
@@ -1106,54 +1085,59 @@
         m = m % 60;
         return h + '시간' + (m ? ' ' + m + '분' : '');
       }
-      /* 전사·정리 두 파이프라인의 남은 시간을 따로 추정해 늦은 쪽을 보여 준다. */
+      /* 지금 단계(전사 또는 정리)의 남은 시간만 본다. */
       function etaLabel() {
-        var bytesLeft = 0;
-        runState.queue.forEach(function (it) {
-          if (it.status === 'pending') bytesLeft += it.size || 0;
-          else if (it.status === 'transcribing') {
+        if (!WORK.phase) return '거의 끝났어요';
+        if (WORK.phase === 'stt') {
+          var bytesLeft = 0;
+          WORK.queue.forEach(function (it) {
+            if (it.transcript) return;
             var f = it.splitTotal > 1 ? Math.min(1, it.splitIndex / it.splitTotal) : 0;
             bytesLeft += (it.size || 0) * (1 - f);
-          }
+          });
+          if (bytesLeft <= 0) return '거의 끝났어요';
+          var elapsed = Math.max(0, nowMs() - WORK.phaseStarted);
+          var rate = (WORK.phaseBytes > 0 && elapsed > 2500) ? WORK.phaseBytes / elapsed : 0;
+          var sec = rate > 0 ? (bytesLeft / rate) / 1000 : (bytesLeft / (1024 * 1024)) * EST_S_PER_MB + 3;
+          return '약 ' + fmtDur(sec) + ' (전사 기준)';
+        }
+        var left = 0;
+        WORK.queue.forEach(function (it) {
+          if (it.status !== 'done' && it.status !== 'error') left += 1;
         });
-        var sttSec = 0;
-        if (bytesLeft > 0) {
-          if (PIPE.sttBytes > 0 && PIPE.sttMs > 2000) sttSec = (bytesLeft / (PIPE.sttBytes / PIPE.sttMs)) / 1000;
-          else sttSec = (bytesLeft / (1024 * 1024)) * EST_S_PER_MB + 3;
-        }
-        var chatLeft = PIPE.chatQ.length + PIPE.chatRun;
-        var chatSec = 0;
-        if (chatLeft > 0) {
-          if (PIPE.chatItems > 0 && PIPE.chatMs > 1500) chatSec = chatLeft / (PIPE.chatItems / (PIPE.chatMs / 1000));
-          else chatSec = 25 * chatLeft;
-        }
-        if (!sttSec && !chatSec) return '거의 끝났어요';
-        if (sttSec <= 0) return '약 ' + fmtDur(chatSec) + ' (정리 기준)';
-        if (chatSec <= 0) return '약 ' + fmtDur(sttSec) + ' (전사 기준)';
-        var by = sttSec >= chatSec ? '전사 기준' : '정리 기준';
-        return '약 ' + fmtDur(Math.max(sttSec, chatSec)) + ' (' + by + ')';
+        if (!left) return '거의 끝났어요';
+        var elapsed2 = Math.max(0, nowMs() - WORK.phaseStarted) / 1000;
+        var rate2 = (WORK.phaseItems > 0 && elapsed2 > 1.5) ? WORK.phaseItems / elapsed2 : 0;
+        return '약 ' + fmtDur(rate2 > 0 ? left / rate2 : 25 * left) + ' (정리 기준)';
       }
       function updateProgressBar() {
         if (!progressWrap) return;
         var active = busy && runState.total > 0;
         progressWrap.hidden = !active;
         if (!active) return;
-        var sum = 0, done = 0;
-        runState.queue.forEach(function (it) {
-          var f = itemFraction(it);
-          sum += f;
-          if (f >= 1) done += 1;
+        var sttTotal = WORK.total || runState.total;
+        var chatTotal = 0, sttSum = 0, chatSum = 0;
+        WORK.list.forEach(function (it) {
+          if (it.runMode !== 'raw') chatTotal += 1;
+          if (it.transcript || it.status === 'done' || it.status === 'queued' || it.status === 'summarizing') sttSum += 1;
+          else if (it.status === 'transcribing') {
+            sttSum += it.splitTotal > 1 ? Math.min(0.95, it.splitIndex / it.splitTotal) : 0.4;
+          }
+          if (it.runMode !== 'raw') {
+            if (it.status === 'done') chatSum += 1;
+            else if (it.status === 'summarizing') chatSum += 0.5;
+          }
         });
-        var pct = Math.max(3, Math.min(100, Math.round((sum / runState.total) * 100)));
+        var totalW = sttTotal + chatTotal;
+        var pct = totalW > 0 ? Math.round(((sttSum + chatSum) / totalW) * 100) : 0;
+        pct = Math.max(3, Math.min(100, pct));
         progressFill.style.width = pct + '%';
         progressPct.textContent = pct + '%';
-        progressText.textContent = done + ' / ' + runState.total + ' 파일 완료';
-        var sttTotal = PIPE.sttDone + PIPE.sttRun + PIPE.sttQ.length;
-        var chatTotal = PIPE.chatDone + PIPE.chatRun + PIPE.chatQ.length;
-        if (sttProg) sttProg.textContent = '전사 ' + PIPE.sttDone + '/' + sttTotal;
+        progressText.textContent = WORK.sttDone + '개 전사 · ' + WORK.chatDone + '개 정리 완료';
+        if (sttProg) sttProg.textContent = '전사 ' + WORK.sttDone + '/' + sttTotal;
         if (chatProg) {
           chatProg.hidden = !chatTotal;
-          chatProg.textContent = '정리 ' + PIPE.chatDone + '/' + chatTotal;
+          chatProg.textContent = '정리 ' + WORK.chatDone + '/' + chatTotal;
         }
         if (etaValue) etaValue.textContent = etaLabel();
       }
@@ -1186,50 +1170,18 @@
       }
       function persistKeys() {
         write(LS.keys, JSON.stringify(keys.map(function (k) { return k.value; })));
-        write(LS.roles, JSON.stringify(keys.map(function (k) { return k.role || ''; })));
         write(LS.activeKey, String(activeKey));
-      }
-      /* 키 역할: '' = 자동. 키 1개는 한 키가 다 하고, 2개는 둘 다 정리+전사(노는 키가 전사),
-         3개 이상은 정리 2 + 전사 1(전사는 노는 키 우선). */
-      function autoRole(i) {
-        if (keys.length <= 2) return 'both';
-        return i < 2 ? 'chat' : 'stt';
-      }
-      function keyRole(i) {
-        var r = keys[i] && keys[i].role;
-        if (r === 'stt' || r === 'chat' || r === 'both') return r;
-        return autoRole(i);
-      }
-      function roleName(i) { return ROLE_NAME[keyRole(i)] || '전사'; }
-      function rolePool(role) {
-        var out = [];
-        for (var i = 0; i < keys.length; i++) {
-          var r = keyRole(i);
-          if (r === role || r === 'both') out.push(i);
-        }
-        return out;
-      }
-      function roleLabel(role) { return role === 'chat' ? '정리' : '전사'; }
-      function renderRolesNote() {
-        renderSettingsSummary();
-        renderQuotaChip();
       }
       function loadKeys() {
         var raw = read(LS.keys);
-        var roles = [];
-        try {
-          var rr = JSON.parse(read(LS.roles) || '[]');
-          if (Object.prototype.toString.call(rr) === '[object Array]') roles = rr;
-        } catch (e) { roles = []; }
         if (raw) {
           try {
             var arr = JSON.parse(raw);
             if (Object.prototype.toString.call(arr) === '[object Array]') {
-              arr.forEach(function (v, i) {
+              arr.forEach(function (v) {
                 if (typeof v === 'string' && v.trim()) {
                   keySeq += 1;
-                  var r = roles[i];
-                  keys.push({ id: 'k' + keySeq, value: v.trim(), role: (r === 'stt' || r === 'chat' || r === 'both') ? r : '' });
+                  keys.push({ id: 'k' + keySeq, value: v.trim() });
                 }
               });
             }
@@ -1253,39 +1205,23 @@
         persistKeys();
         renderKeys();
       }
-      function roleSelectHtml(i) {
-        var r = keys[i].role || '';
-        function opt(v, label) {
-          return '<option value="' + v + '"' + (r === v ? ' selected' : '') + '>' + label + '</option>';
-        }
-        return '<span class="select-wrap key-role">' +
-          '<select class="role-select" data-role="' + i + '" aria-label="' + (i + 1) + '번 키 역할">' +
-            opt('', '자동 · ' + ROLE_NAME[autoRole(i)]) +
-            opt('stt', '전사') +
-            opt('chat', '정리') +
-            opt('both', '둘 다') +
-          '</select>' +
-          '<svg class="ic ic-sm chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9.5l6 6 6-6"></path></svg>' +
-        '</span>';
-      }
       function renderKeys() {
         keyList.innerHTML = '';
         keys.forEach(function (k, i) {
           var li = document.createElement('li');
           li.className = 'key-row' + (i === activeKey ? ' active' : '');
-          var flag = i === activeKey ? '사용 중' : (i + 1) + '번 대기';
+          var flag = i === activeKey ? '사용 중' : '대기';
           li.innerHTML =
             '<button class="key-pick" type="button" data-pick="' + i + '" aria-pressed="' + (i === activeKey ? 'true' : 'false') + '" aria-label="' + (i + 1) + '번 키를 사용 키로 선택">' +
               '<span class="key-dot"></span>' +
               '<span class="key-main">' +
                 '<span class="key-line">' +
                   '<span class="key-mask">' + escapeHtml(maskKey(k.value)) + '</span>' +
-                  '<span class="key-flag' + (i === activeKey ? '' : ' idle') + '">' + escapeHtml(flag) + '</span>' +
+                  '<span class="key-flag' + (i === activeKey ? '' : ' idle') + '" data-flag="' + i + '">' + escapeHtml(flag) + '</span>' +
                 '</span>' +
-                '<span class="key-meta">' + escapeHtml(quotaLine(k, false, roleName(i))) + '</span>' +
+                '<span class="key-meta">' + escapeHtml(quotaLine(k, false)) + '</span>' +
               '</span>' +
             '</button>' +
-            roleSelectHtml(i) +
             '<button class="icon-btn sm" type="button" data-del="' + i + '" aria-label="' + (i + 1) + '번 키 삭제">' +
               '<svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>' +
             '</button>';
@@ -1294,28 +1230,15 @@
         keyCountChip.textContent = keys.length + '개 등록';
         renderSettingsSummary();
         renderQuotaChip();
+        renderWorkerStates();
         updateRunButton();
       }
-      keyList.addEventListener('change', function (e) {
-        var sel = e.target.closest ? e.target.closest('[data-role]') : null;
-        if (!sel) return;
-        var i = parseInt(sel.getAttribute('data-role'), 10);
-        if (isNaN(i) || !keys[i]) return;
-        var v = sel.value;
-        keys[i].role = (v === 'stt' || v === 'chat' || v === 'both') ? v : '';
-        persistKeys();
-        renderKeys();
-        if (busy) setStatus('키 역할은 다음 실행부터 적용됩니다.', false, false);
-      });
       function renderSettingsSummary() {
         if (sumKeys) {
           sumKeys.textContent = keys.length ? 'API 키 ' + keys.length + '개 등록' : 'API 키 없음';
           sumKeys.classList.toggle('warn', keys.length === 0);
         }
         if (sumModels) sumModels.textContent = STT[sttChoice].name + ' · ' + prettyModel(chatModel.value);
-        if (sumModels && keys.length > 1) {
-          sumModels.textContent += ' · 정리 ' + Math.max(1, rolePool('chat').length) + ' · 전사 ' + Math.max(1, rolePool('stt').length);
-        }
         renderSpeed();
       }
 
@@ -1578,6 +1501,10 @@
           probing: false,
           runMs: 0,
           sttMs: 0,
+          chatStartedAt: 0,
+          partsDone: 0,
+          partTexts: [],
+          partSilent: 0,
           runMode: '',
           route: '',
           routeNote: '',
@@ -2101,101 +2028,119 @@
         }
       }
 
-      /* ---------- 파이프라인: 키 역할별 전사/정리 워커 ---------- */
-      var PIPE = {
-        sttQ: [], chatQ: [], sttRun: 0, chatRun: 0,
-        busy: {}, cool: {}, total: 0,
-        sttDone: 0, chatDone: 0, sttBytes: 0, sttMs: 0, chatItems: 0, chatMs: 0,
+      /* ---------- 작업 큐: 키 하나 = 워커 하나 (균등 분배 + 작업 가져오기) ---------- */
+      /* 1단계에서 파일을 키 수만큼 나눠 순서대로 전사하고, 자기 몫을 끝낸 키는
+         아직 아무도 시작하지 않은 작업을 앞에서부터 가져온다. 2단계(정리)도 같은 방식. */
+      var WORK = {
+        phase: '', list: [], queue: [], taken: {},
+        workers: [], cool: {}, total: 0,
+        sttDone: 0, chatDone: 0,
+        phaseStarted: 0, phaseBytes: 0, phaseItems: 0,
         startedMs: 0
       };
-      var keyWaiters = [];
 
       function keyInfoOf(i) {
         return { value: keys[i].value, num: i + 1, listIndex: i, id: keys[i].id };
       }
-      function releaseKey(i) {
-        PIPE.busy[i] = false;
-        var list = keyWaiters;
-        keyWaiters = [];
-        list.forEach(function (fn) { fn(); });
+      function shortName(name) {
+        var s = String(name || '');
+        return s.length > 16 ? s.slice(0, 15) + '…' : s;
       }
-      function waitKey() {
-        return new Promise(function (res) { keyWaiters.push(res); });
-      }
-      function coolLeft(keysInRole) {
-        var now = Date.now(), best = 0, i;
-        for (i = 0; i < keys.length; i++) {
-          if (keysInRole && keysInRole.indexOf(i) === -1) continue;
-          var left = (PIPE.cool[i] || 0) - now;
-          if (left > 0 && (!best || left < best)) best = left;
+      /* 파일 목록을 키 수만큼 개수 기준으로 나눈다(나머지는 앞쪽 키부터 하나씩). */
+      function setupPhase(phase, list) {
+        WORK.phase = phase;
+        WORK.queue = list.slice();
+        WORK.taken = {};
+        WORK.phaseStarted = nowMs();
+        WORK.phaseBytes = 0;
+        WORK.phaseItems = 0;
+        var k = Math.max(1, keys.length);
+        var n = list.length;
+        var base = Math.floor(n / k), rem = n % k;
+        WORK.workers = [];
+        var start = 0;
+        for (var w = 0; w < k; w++) {
+          var size = base + (w < rem ? 1 : 0);
+          WORK.workers.push({ key: w, cursor: start, end: start + size, share: size, done: 0, state: 'idle', cur: null });
+          start += size;
         }
-        return best;
+        renderWorkerStates();
       }
-      /* 역할에 맞는 빈 키 하나를 고른다. 역할 키가 하나도 없으면 다른 키로도 처리한다. */
-      function takeKey(role, skip) {
-        var now = Date.now(), prefer = [], shared = [], other = [], i;
-        for (i = 0; i < keys.length; i++) {
-          if (PIPE.busy[i] || (PIPE.cool[i] || 0) > now || (skip && skip[i])) continue;
-          var r = keyRole(i);
-          if (r === role) prefer.push(i);
-          else if (r === 'both') shared.push(i);
-          else other.push(i);
+      /* 자기 몫에서 하나, 없으면 큐 앞에서부터 아무도 안 잡은 작업을 하나 가져온다. */
+      function claim(worker) {
+        var q = WORK.queue, taken = WORK.taken, i, it;
+        for (i = worker.cursor; i < worker.end; i++) {
+          it = q[i];
+          if (!it || taken[it.id]) continue;
+          taken[it.id] = true;
+          worker.cursor = i + 1;
+          return it;
         }
-        if (prefer.length) return prefer[0];
-        if (shared.length) return shared[0];
-        if (!rolePool(role).length && other.length) return other[0];
-        return -1;
+        if (worker.cursor < worker.end) worker.cursor = worker.end;
+        for (i = 0; i < q.length; i++) {
+          it = q[i];
+          if (!it || taken[it.id]) continue;
+          taken[it.id] = true;
+          return it;
+        }
+        return null;
       }
-      /* 키 하나를 잡아 요청 하나를 보낸다. 그 키가 429면 쿨다운시키고 역할 안의 다른 키로 넘긴다. */
-      function withKey(role, attempt) {
-        var tried = {}, guard = 0;
-        function go() {
-          guard += 1;
-          if (guard > 400) {
-            return Promise.reject(new Error(roleLabel(role) + '에 쓸 수 있는 키가 없습니다. 설정에서 키 역할을 확인해 주세요.'));
+      function unclaim(it) {
+        if (it) delete WORK.taken[it.id];
+      }
+      function workerSummary() {
+        var parts = [];
+        WORK.workers.forEach(function (w) {
+          if (w.state === 'busy' && w.cur) parts.push((w.key + 1) + '번 키 · ' + shortName(w.cur.name));
+          else if (w.state === 'cool') parts.push((w.key + 1) + '번 키 · 한도 대기');
+        });
+        return parts.join(' · ');
+      }
+      function phaseLabel() {
+        if (WORK.phase === 'chat') return '정리';
+        if (WORK.phase === 'stt') return '전사';
+        return '';
+      }
+      function announceWorkerState() {
+        var sum = workerSummary();
+        if (!busy || !WORK.phase) return;
+        setStatus(phaseLabel() + ' 중' + (sum ? ' · ' + sum : ''), true, false);
+      }
+      function renderWorkerStates() {
+        keys.forEach(function (k, i) {
+          var el = keyList.querySelector('[data-flag="' + i + '"]');
+          if (!el) return;
+          var w = null;
+          WORK.workers.forEach(function (x) { if (x.key === i) w = x; });
+          if (!w) {
+            el.textContent = i === activeKey ? '사용 중' : '대기';
+            el.className = 'key-flag' + (i === activeKey ? '' : ' idle');
+            return;
           }
-          var idx = takeKey(role, tried);
-          if (idx >= 0) {
-            PIPE.busy[idx] = true;
-            return Promise.resolve().then(function () {
-              return attempt(keyInfoOf(idx));
-            }).then(function (val) {
-              releaseKey(idx);
-              return val;
-            }, function (err) {
-              releaseKey(idx);
-              if (err && err.rateLimited) {
-                var sec = err.waitSec > 0 ? Math.min(Math.max(err.waitSec, 1), 300) : DEFAULT_COOL_SEC;
-                PIPE.cool[idx] = Date.now() + sec * 1000;
-                tried[idx] = true;
-                var all = true, t;
-                for (t = 0; t < keys.length; t++) { if (!tried[t]) all = false; }
-                if (all) tried = {};
-                if (keys.length > 1) {
-                  addNotice((idx + 1) + '번 키가 한도(429)에 걸려 잠시 쉬고, ' + roleLabel(role) + ' 역할의 다른 키로 넘깁니다.');
-                }
-                return go();
-              }
-              throw err;
-            });
+          if (w.state === 'busy') {
+            el.textContent = '작업 중 · ' + w.done + '/' + Math.max(w.share, w.done);
+            el.className = 'key-flag';
+          } else if (w.state === 'cool') {
+            el.textContent = '대기(한도)';
+            el.className = 'key-flag idle';
+          } else {
+            el.textContent = '대기';
+            el.className = 'key-flag idle';
           }
-          var pool = rolePool(role);
-          var left = coolLeft(pool.length ? pool : null);
-          if (left > 0) {
-            setStatus(roleLabel(role) + ' 키가 한도 대기 중 · 약 ' + Math.ceil(left / 1000) + '초 뒤 이어서 ' + roleLabel(role) + '합니다', true, false);
-          }
-          return Promise.race([waitKey(), sleep(Math.min(Math.max(left, 300), 3000))]).then(go);
-        }
-        return go();
+        });
+      }
+      function keyInfoOfWorker(w) { return keyInfoOf(w.key); }
+      function coolLeftFor(keyIndex) {
+        return Math.max(0, (WORK.cool[keyIndex] || 0) - Date.now());
+      }
+      function setCool(keyIndex, sec) {
+        WORK.cool[keyIndex] = Date.now() + Math.max(1, sec) * 1000;
       }
 
       /* ---------- 받아쓰기 요청 (조각 1개 = 요청 1개) ---------- */
       /* opts: { file, seconds, label, allowEmpty } — 분할 조각은 조각 파일을 file로 넘긴다. */
-      function sttChunk(it, lang, opts) {
-        opts = opts || {};
-        return withKey('stt', function (ki) {
-          return sttAttemptKey(ki, it, lang, opts);
-        });
+      function sttChunk(ki, it, lang, opts) {
+        return sttAttemptKey(ki, it, lang, opts || {});
       }
       function sttAttemptKey(ki, it, lang, opts) {
         var upload = opts.file || it.file;
@@ -2250,13 +2195,17 @@
 
       /* 25MB 초과 또는 배속: 디코딩 → (배속) → 16kHz 모노 WAV 한 개 또는 10분 청크들 → 순서대로 받아쓰기
          (ffmpeg를 못 쓰는 브라우저·실패 시의 마지막 경로) */
-      function transcribeSplit(it, lang, speed) {
+      /* 25MB 초과 또는 배속: 디코딩 → (배속) → 16kHz 모노 WAV 한 개 또는 10분 청크들 → 순서대로 받아쓰기
+         (ffmpeg를 못 쓰는 브라우저·실패 시의 마지막 경로. 429로 끊기면 처음부터 다시 한다) */
+      function transcribeSplit(it, lang, speed, ki) {
         var cleanup = function () {};
         var texts = [];
         var silent = 0;
         it.status = 'transcribing';
         it.splitIndex = 0;
         it.splitTotal = 0;
+        it.partsDone = 0;
+        it.partTexts = [];
         setStatus((speed > 1.0001 ? '배속·' : '') + '나누는 준비 중 · ' + it.name, true, false);
         updateCard(it);
 
@@ -2284,11 +2233,10 @@
               var start = i * per;
               var stop = Math.min(outLen, start + per);
               var tag = parts > 1 ? '분할 받아쓰기 (' + (i + 1) + '/' + parts + ')' : '받아쓰기';
-              setStatus((speed > 1.0001 ? fmtSpeed(speed) + ' 배속 · ' : '') + '나누는 중 · ' + it.name + ' (' + (i + 1) + '/' + parts + ')', true, false);
               return encodeWavChunk(audio, start, stop).then(function (blob) {
                 var name = (parts > 1 ? it.base + '-part' + (i + 1) + 'of' + parts : it.base) + '.wav';
                 var chunk = new File([blob], name, { type: 'audio/wav', lastModified: Date.now() });
-                return sttChunk(it, lang, {
+                return sttChunk(ki, it, lang, {
                   file: chunk,
                   seconds: (stop - start) / SPLIT_RATE,
                   label: tag,
@@ -2296,6 +2244,7 @@
                 }).then(function (text) {
                   if (text) texts.push(text); else silent += 1;
                   it.splitIndex = i + 1;
+                  it.partsDone = i + 1;
                   updateCard(it);
                   updateProgressBar();
                   return step(i + 1);
@@ -2321,6 +2270,7 @@
           return list.join('\n\n');
         }, function (err) {
           cleanup();
+          if (err && err.rateLimited) throw err;
           if (texts.length) {
             it.transcript = texts.join('\n\n');
             it.tab = 'transcript';
@@ -2331,20 +2281,20 @@
       }
 
       /* ---------- ffmpeg로 잘라 가며 받아쓰기 ---------- */
-      /* 원본 File은 WORKERFS로 마운트해 읽고, 출력 조각은 하나씩 MEMFS에 만든 뒤 바로 보내고 지운다. */
-      function transcribeFfmpeg(it, lang, speed) {
-        var texts = [];
-        var silent = 0;
-        var parts = 0;
-        var produced = 0;
+      /* 원본 File은 WORKERFS로 마운트해 읽고, 출력 조각은 하나씩 MEMFS에 만든 뒤 바로 보내고 지운다.
+         한도를 만나 끊기면 이미 받아쓴 조각(it.partTexts)은 두고 다음 조각부터 이어 간다. */
+      function transcribeFfmpeg(it, lang, speed, ki) {
+        var texts = it.partTexts || (it.partTexts = []);
+        var silent = it.partSilent || 0;
+        var parts = it.partsDone || 0;
+        var produced = parts;
         var eof = false;
         var inst = null;
         var inPath = '/input/' + (it.file.name || ('in-' + it.id));
 
         it.status = 'transcribing';
-        it.splitIndex = 0;
-        it.splitTotal = 0;
-        it.splitMethod = '';
+        it.splitIndex = parts;
+        if (!it.splitTotal) it.splitTotal = 0;
         it.loadingFF = !(ffState.inst && ffState.inst.loaded);
         setStatus((it.loadingFF ? '분할 준비 중 (ffmpeg 1회 로딩) · ' : '분할 준비 중 · ') + it.name, true, false);
         updateCard(it);
@@ -2376,7 +2326,7 @@
 
         function runRoute(plan) {
           var total = plan.dur > 0 ? Math.max(1, Math.ceil((plan.dur / plan.shift) / plan.sec)) : 0;
-          it.splitTotal = total;
+          it.splitTotal = total || it.splitTotal || 0;
           updateCard(it);
 
           function step() {
@@ -2430,14 +2380,16 @@
               it.splitIndex = part;
               updateCard(it);
               updateProgressBar();
-              return sttChunk(it, lang, {
+              return sttChunk(ki, it, lang, {
                 file: chunk,
                 seconds: plan.sec,
                 label: total > 1 ? '분할 받아쓰기 (' + part + '/' + total + ')' : '받아쓰기',
                 allowEmpty: true
               }).then(function (text) {
-                if (text) texts.push(text); else silent += 1;
-                parts = produced;
+                if (text) texts[part - 1] = text; else silent += 1;
+                it.partSilent = silent;
+                it.partsDone = part;
+                it.splitMethod = plan.route;
                 updateCard(it);
                 return step();
               });
@@ -2452,18 +2404,25 @@
         }
         function tryRoute(ri) {
           var list = routeList();
+          if (it.splitMethod && parts > 0) {
+            var saved = list.indexOf(it.splitMethod);
+            if (saved > ri) ri = saved;
+          }
           if (ri >= list.length) {
-            if (!parts) throw ffFallbackError();
+            if (!produced) throw ffFallbackError();
             return Promise.resolve();
           }
           var route = list[ri];
           var plan = planFor(route);
           if (route === 'copy' && plan.sec < 20) return tryRoute(ri + 1);
           it.splitMethod = route;
-          var sent = parts;
+          var sent = produced;
           return runRoute(plan).then(function () {}, function (err) {
             /* 아직 아무 조각도 보내지 않았으면 다음 방식으로 넘어간다. */
-            if (parts === sent) return tryRoute(ri + 1);
+            if (produced === sent) {
+              it.splitMethod = '';
+              return tryRoute(ri + 1);
+            }
             throw err;
           });
         }
@@ -2474,70 +2433,72 @@
           updateCard(it);
           return tryRoute(0);
         }).then(function () {
-          if (!texts.length) {
+          var joined = texts.filter(function (t) { return !!t; }).join('\n\n');
+          if (!joined) {
             throw new Error('음성을 인식하지 못했습니다. 이 파일에서 말소리를 찾지 못했으니 다른 녹음을 확인해 주세요.');
           }
-          if (parts > 1) addNotice(it.name + ': ' + parts + '개 구간으로 나누어 받아쓰기한 뒤 하나로 합쳤습니다.');
+          if (produced > 1) addNotice(it.name + ': ' + produced + '개 구간으로 나누어 받아쓰기한 뒤 하나로 합쳤습니다.');
           if (silent) addNotice(it.name + ': 구간 ' + silent + '개에서는 음성을 인식하지 못했습니다.');
-          it.splitTotal = parts;
-          it.splitIndex = parts;
+          it.splitTotal = produced;
+          it.splitIndex = produced;
           updateCard(it);
-          return texts.join('\n\n');
+          return joined;
         }, function (err) {
-          if (texts.length) {
-            it.transcript = texts.join('\n\n');
+          if (err && err.rateLimited) throw err;
+          var partial = texts.filter(function (t) { return !!t; }).join('\n\n');
+          if (partial) {
+            it.transcript = partial;
             it.tab = 'transcript';
-            err.message = err.message + ' (' + texts.length + '/' + (parts || '?') + '개 구간까지 받아쓰기한 텍스트만 남겼습니다.)';
+            err.message = err.message + ' (' + texts.filter(function (t) { return !!t; }).length + '/' + (produced || '?') + '개 구간까지 받아쓰기한 텍스트만 남겼습니다.)';
           }
           throw err;
         });
       }
 
       /* ---------- 정리(요약·필기) 요청 ---------- */
-      /* 모델 폴백(선택 → gpt-oss-20b → gpt-oss-120b)은 조각/파일 단위로, 키 전환은 정리 역할 안에서. */
-      function askChat(system, user, label) {
+      /* 모델 폴백(선택 → gpt-oss-20b → gpt-oss-120b)은 그대로. 이 키의 두 모델이 모두 429면
+         rateLimited 로 던져 작업이 큐로 돌아가고 다른 키가 가져간다. */
+      function askChat(ki, system, user, label) {
         var models = chatOrder();
-        return withKey('chat', function (ki) {
-          var lastWait = 0;
-          function attemptModel(mi) {
-            if (mi >= models.length) {
-              var e = new Error('rate limited');
-              e.rateLimited = true;
-              e.waitSec = lastWait;
-              e.keyNum = ki.num;
-              throw e;
-            }
-            var model = models[mi];
-            setStatus(label + ' 중 · ' + prettyModel(model) + (keys.length > 1 ? ' · ' + ki.num + '번 키' : ''), true, false);
-            return chatRequest(ki.value, model, system, user).then(function (res) {
-              noteRateLimit(ki, res, prettyModel(model));
-              if (res.status === 429) {
-                lastWait = retryAfter(res);
-                if (mi + 1 < models.length) {
-                  addNotice("'" + prettyModel(model) + "' 모델 한도(429)에 걸려 '" + prettyModel(models[mi + 1]) + "' 모델로 전환합니다.");
-                }
-                return attemptModel(mi + 1);
-              }
-              if (!res.ok) {
-                return friendlyError(res, label).then(function (msg) { throw new Error(msg); });
-              }
-              return res.json().then(function (data) {
-                var choice = data && data.choices && data.choices[0];
-                var content = choice && choice.message && choice.message.content ? choice.message.content.trim() : '';
-                if (!content) throw new Error(label + ' 결과가 비어 있습니다. 잠시 후 다시 시도해 주세요.');
-                recordUsage(ki.value, 'chat', 0);
-                if (keys.length > 1) noteKeySwitch(ki);
-                return { text: content, model: model, keyNum: ki.num };
-              });
-            });
+        var lastWait = 0;
+        function attemptModel(mi) {
+          if (mi >= models.length) {
+            var e = new Error('rate limited');
+            e.rateLimited = true;
+            e.waitSec = lastWait;
+            e.keyNum = ki.num;
+            throw e;
           }
-          return attemptModel(0);
-        });
+          var model = models[mi];
+          setStatus(label + ' 중 · ' + prettyModel(model) + (keys.length > 1 ? ' · ' + ki.num + '번 키' : ''), true, false);
+          return chatRequest(ki.value, model, system, user).then(function (res) {
+            noteRateLimit(ki, res, prettyModel(model));
+            if (res.status === 429) {
+              lastWait = retryAfter(res);
+              if (mi + 1 < models.length) {
+                addNotice("'" + prettyModel(model) + "' 모델 한도(429)에 걸려 '" + prettyModel(models[mi + 1]) + "' 모델로 전환합니다.");
+              }
+              return attemptModel(mi + 1);
+            }
+            if (!res.ok) {
+              return friendlyError(res, label).then(function (msg) { throw new Error(msg); });
+            }
+            return res.json().then(function (data) {
+              var choice = data && data.choices && data.choices[0];
+              var content = choice && choice.message && choice.message.content ? choice.message.content.trim() : '';
+              if (!content) throw new Error(label + ' 결과가 비어 있습니다. 잠시 후 다시 시도해 주세요.');
+              recordUsage(ki.value, 'chat', 0);
+              if (keys.length > 1) noteKeySwitch(ki);
+              return { text: content, model: model, keyNum: ki.num };
+            });
+          });
+        }
+        return attemptModel(0);
       }
 
       function noteKeySwitch(keyInfo) {
         if (keyInfo.listIndex === activeKey) return false;
-        addNotice(keyInfo.num + '번 키로 전환했습니다. 앞선 키가 한도(429)에 걸렸습니다.');
+        addNotice(keyInfo.num + '번 키로 작업했습니다.');
         setActiveKey(keyInfo.listIndex);
         return true;
       }
@@ -2917,7 +2878,7 @@
         it.notesBusy = true;
         saveCustom();
         setStatus('필기 정리 중 · ' + it.name, true, false);
-        askChat(notesPrompt() + customDirective(), it.transcript, '필기 정리하는').then(function (res) {
+        askChat(keyInfoOf(activeKey), notesPrompt() + customDirective(), it.transcript, '필기 정리하는').then(function (res) {
           it.notes = res.text;
           it.status = 'done';
           it.error = '';
@@ -2933,7 +2894,7 @@
       }
 
       /* ---------- processing ---------- */
-      function finishItem(it, mode, text) {
+      function finishItem(it, mode, text, ki) {
         it.transcript = text;
         if (mode === 'raw') {
           it.tab = 'transcript';
@@ -2942,7 +2903,7 @@
           return Promise.resolve();
         }
         it.tab = 'summary';
-        return askChat(summaryPrompt(mode) + customDirective(), text, '정리하는').then(function (res) {
+        return askChat(ki, summaryPrompt(mode) + customDirective(), text, '정리하는').then(function (res) {
           it.summary = res.text;
           it.chatUsed = res.model;
           it.chatKeyNum = res.keyNum;
@@ -2951,35 +2912,38 @@
       }
 
       /* 파일 하나의 전사: 원본 그대로 / ffmpeg로 잘라 가며 / 브라우저 디코딩 */
-      function transcribeItem(it) {
-        it.error = '';
-        it.sttFallback = false;
-        it.sttUsed = '';
-        it.chatUsed = '';
-        it.keyNum = 0;
-        it.chatKeyNum = 0;
-        it.keysUsed = [];
-        it.splitTotal = 0;
-        it.splitIndex = 0;
-        it.splitMethod = '';
-        it.routeNote = '';
-        it.speed = speedValue;
-        it.transcript = '';
-        it.summary = '';
-        it.notes = '';
-        it.open = true;
-
+      function transcribeItem(it, ki) {
         var lang = langSelect.value;
-        it.route = chooseRoute(it, it.speed);
-        updateCard(it);
+        if (!it.route || it.partsDone === 0) {
+          it.error = '';
+          it.sttFallback = false;
+          it.sttUsed = '';
+          it.chatUsed = '';
+          it.keyNum = 0;
+          it.chatKeyNum = 0;
+          it.keysUsed = [];
+          it.splitTotal = 0;
+          it.splitIndex = 0;
+          it.partTexts = [];
+          it.partsDone = 0;
+          it.partSilent = 0;
+          it.speed = speedValue;
+          it.transcript = '';
+          it.summary = '';
+          it.notes = '';
+          it.open = true;
+          it.route = chooseRoute(it, it.speed);
+          if (it.route === 'direct' || it.route === 'decode') it.splitMethod = '';
+          updateCard(it);
+        }
 
         if (it.route === 'direct') {
           it.status = 'transcribing';
           updateCard(it);
-          return sttChunk(it, lang, { label: '받아쓰기' });
+          return sttChunk(ki, it, lang, { label: '받아쓰기' });
         }
-        if (it.route === 'decode') return transcribeSplit(it, lang, it.speed);
-        return transcribeFfmpeg(it, lang, it.speed).catch(function (err) {
+        if (it.route === 'decode') return transcribeSplit(it, lang, it.speed, ki);
+        return transcribeFfmpeg(it, lang, it.speed, ki).catch(function (err) {
           if (!err || !err.ffFallback) throw err;
           it.route = 'decode';
           it.routeNote = '브라우저 디코딩으로 대체';
@@ -2987,107 +2951,129 @@
           it.splitIndex = 0;
           addNotice(it.name + ': 미리 자르기(ffmpeg)를 쓰지 못해 브라우저 디코딩으로 처리합니다.');
           renderRouteState();
-          return transcribeSplit(it, lang, it.speed);
+          return transcribeSplit(it, lang, it.speed, ki);
         });
       }
 
-      /* ---------- 실행: 전사 워커 → 정리 워커 파이프라인 ---------- */
-      function resetPipe() {
-        PIPE.sttQ = []; PIPE.chatQ = [];
-        PIPE.sttRun = 0; PIPE.chatRun = 0;
-        PIPE.busy = {}; PIPE.cool = {};
-        PIPE.sttDone = 0; PIPE.chatDone = 0;
-        PIPE.sttBytes = 0; PIPE.sttMs = 0; PIPE.chatItems = 0; PIPE.chatMs = 0;
-        PIPE.startedMs = nowMs();
-      }
-      function pumpPipeline() {
-        var chatCap = Math.max(1, rolePool('chat').length);
-        var sttCap = Math.max(1, rolePool('stt').length);
-        /* 정리를 먼저 띄우고, 대기 중인 정리가 있으면 전사는 키 하나를 정리에 남겨 둔다. */
-        while (PIPE.chatRun < chatCap && PIPE.chatQ.length) startChatJob(PIPE.chatQ.shift());
-        var sttLimit = Math.min(sttCap, keys.length);
-        if (PIPE.chatQ.length && sttLimit > 1) sttLimit -= 1;
-        if (sttLimit < 1) sttLimit = 1;
-        while (PIPE.sttRun < sttLimit && PIPE.sttQ.length) startSttJob(PIPE.sttQ.shift());
-        checkRunDone();
-      }
-      function startSttJob(it) {
-        PIPE.sttRun += 1;
-        it.startedAt = nowMs();
-        setStatus('(' + (PIPE.sttDone + 1) + '/' + (PIPE.sttDone + PIPE.sttRun + PIPE.sttQ.length) + ') ' + it.name, true, false);
-        updateProgressBar();
-        transcribeItem(it).then(function (text) {
-          it.sttMs = Math.max(0, nowMs() - it.startedAt);
-          it.runMs = it.sttMs;
-          it.transcript = text || '';
-          PIPE.sttRun -= 1;
-          PIPE.sttDone += 1;
-          PIPE.sttBytes += it.size || 0;
-          PIPE.sttMs += it.sttMs;
-          if (it.runMode === 'raw') {
+      /* ---------- 실행: 1단계 전사 → 2단계 정리 (키별 균등 분배 + 작업 가져오기) ---------- */
+      function workerTask(worker, phase, it) {
+        var ki = keyInfoOf(worker.key);
+        worker.cur = it;
+        worker.state = 'busy';
+        renderWorkerStates();
+        announceWorkerState();
+        var p = phase === 'stt' ? transcribeItem(it, ki) : finishItem(it, it.runMode, it.transcript, ki);
+        return p.then(function (val) {
+          worker.cur = null;
+          worker.done += 1;
+          if (phase === 'stt') {
+            it.transcript = val || '';
+            it.status = it.runMode === 'raw' ? 'done' : 'queued';
+            WORK.sttDone += 1;
+            WORK.phaseBytes += it.size || 0;
+            if (it.runMode === 'raw') it.tab = 'transcript';
+          } else {
             it.status = 'done';
-            it.tab = 'transcript';
-            updateCard(it);
-            updateProgressBar();
-            pumpPipeline();
-            return;
+            WORK.chatDone += 1;
+            WORK.phaseItems += 1;
           }
-          /* 전사가 끝나면 바로 정리 큐로 넘겨 다음 파일 전사와 겹쳐 돌린다. */
-          it.status = 'queued';
           updateCard(it);
-          PIPE.chatQ.push(it);
           updateProgressBar();
-          pumpPipeline();
+          renderWorkerStates();
+          return true;
         }, function (err) {
-          PIPE.sttRun -= 1;
+          worker.cur = null;
+          if (err && err.rateLimited) {
+            /* 이 키의 몫을 큐로 되돌리고 키는 쿨다운 동안 쉰다. */
+            var sec = err.waitSec > 0 ? Math.min(Math.max(err.waitSec, 1), 300) : DEFAULT_COOL_SEC;
+            setCool(worker.key, sec);
+            unclaim(it);
+            it.status = phase === 'stt' ? 'pending' : 'queued';
+            if (phase === 'chat') it.chatStartedAt = 0;
+            if (keys.length > 1) {
+              addNotice((worker.key + 1) + '번 키가 한도(429)에 걸려 ' + sec + '초 쉬는 동안 남은 작업을 다른 키가 가져옵니다.');
+            }
+            updateCard(it);
+            renderWorkerStates();
+            return true;
+          }
+          worker.done += 1;
           it.status = 'error';
           it.error = err && err.message ? err.message : String(err);
-          if (it.transcript) it.tab = 'transcript';
+          if (phase === 'stt') {
+            WORK.sttDone += 1;
+            WORK.phaseBytes += it.size || 0;
+            if (it.transcript) it.tab = 'transcript';
+          } else {
+            WORK.chatDone += 1;
+            WORK.phaseItems += 1;
+          }
           updateCard(it);
           updateProgressBar();
-          pumpPipeline();
+          renderWorkerStates();
+          return true;
         });
       }
-      function startChatJob(it) {
-        PIPE.chatRun += 1;
-        it.status = 'summarizing';
-        it.tab = 'summary';
-        it.chatStartedAt = nowMs();
-        updateCard(it);
-        updateProgressBar();
-        function after() {
-          PIPE.chatRun -= 1;
-          PIPE.chatDone += 1;
-          PIPE.chatItems += 1;
-          PIPE.chatMs += Math.max(0, nowMs() - it.chatStartedAt);
-          updateCard(it);
-          updateProgressBar();
-          pumpPipeline();
+
+      function runWorker(worker, phase) {
+        function step() {
+          if (!busy) return Promise.resolve();
+          var left = coolLeftFor(worker.key);
+          if (left > 0) {
+            worker.state = 'cool';
+            renderWorkerStates();
+            announceWorkerState();
+            return sleep(Math.min(left, 1500)).then(step);
+          }
+          var it = claim(worker);
+          if (!it) {
+            worker.state = 'idle';
+            renderWorkerStates();
+            return Promise.resolve();
+          }
+          if (phase === 'stt') it.startedAt = nowMs();
+          else it.chatStartedAt = nowMs();
+          return workerTask(worker, phase, it).then(step);
         }
-        finishItem(it, it.runMode, it.transcript).then(function () {
-          it.status = 'done';
-          after();
-        }, function (err) {
-          it.status = 'error';
-          it.error = err && err.message ? err.message : String(err);
-          after();
+        return step();
+      }
+
+      function startPhase(phase) {
+        var list = phase === 'chat'
+          ? WORK.list.filter(function (it) { return it.runMode !== 'raw' && it.transcript; })
+          : WORK.list.slice();
+        if (!list.length) {
+          if (phase === 'stt') return startPhase('chat');
+          return finishRun();
+        }
+        setupPhase(phase, list);
+        updateProgressBar();
+        announceWorkerState();
+        var runs = WORK.workers.map(function (w) { return runWorker(w, phase); });
+        return Promise.all(runs).then(function () {
+          if (!busy) return;
+          if (phase === 'stt') return startPhase('chat');
+          return finishRun();
         });
       }
-      function checkRunDone() {
-        if (!busy) return;
-        if (PIPE.sttQ.length || PIPE.chatQ.length || PIPE.sttRun || PIPE.chatRun) return;
+
+      function finishRun() {
         busy = false;
+        WORK.phase = '';
+        WORK.workers.forEach(function (w) { w.state = 'idle'; w.cur = null; });
+        renderWorkerStates();
         var ok = 0, err = 0;
-        runState.queue.forEach(function (it) {
+        WORK.list.forEach(function (it) {
           if (it.status === 'done') ok += 1; else err += 1;
         });
         updateProgressBar();
         updateRunButton();
-        var parts = [runState.total + '개 중 ' + ok + '개 완료'];
+        var parts = [WORK.total + '개 중 ' + ok + '개 완료'];
         if (err) parts.push(err + '개 오류');
         setStatus(parts.join(' · '), false, err > 0);
         if (ok) showToast(ok + '개 파일 정리 완료');
         runState = { total: 0, queue: [], startedMs: 0 };
+        WORK.queue = [];
         updateProgressBar();
       }
 
@@ -3099,9 +3085,13 @@
         busy = true;
         hideNotice();
         saveCustom();
-        resetPipe();
-        PIPE.total = queue.length;
-        runState = { total: queue.length, queue: queue, startedMs: PIPE.startedMs };
+        WORK.list = queue;
+        WORK.total = queue.length;
+        WORK.sttDone = 0;
+        WORK.chatDone = 0;
+        WORK.cool = {};
+        WORK.startedMs = nowMs();
+        runState = { total: queue.length, queue: queue, startedMs: WORK.startedMs };
         var mode = modeChoice;
         queue.forEach(function (it) {
           it.runMs = 0;
@@ -3110,13 +3100,18 @@
           it.open = true;
           it.error = '';
           it.status = 'pending';
-          PIPE.sttQ.push(it);
+          it.route = '';
+          it.partsDone = 0;
+          it.partTexts = [];
+          it.transcript = '';
+          it.summary = '';
+          it.notes = '';
         });
         items.forEach(function (it) { if (queue.indexOf(it) !== -1) it.open = true; });
         renderResults();
         updateRunButton();
         updateProgressBar();
-        pumpPipeline();
+        startPhase('stt');
       }
       runBtn.addEventListener('click', runAll);
 
