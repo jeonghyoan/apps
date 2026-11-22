@@ -1085,6 +1085,13 @@
         m = m % 60;
         return h + '시간' + (m ? ' ' + m + '분' : '');
       }
+      function chatPending() {
+        var n = 0;
+        WORK.queue.forEach(function (it) {
+          if (it.runMode !== 'raw' && it.status !== 'done' && it.status !== 'error') n += 1;
+        });
+        return n;
+      }
       /* 지금 단계(전사 또는 정리)의 남은 시간만 본다. */
       function etaLabel() {
         if (!WORK.phase) return '거의 끝났어요';
@@ -1095,16 +1102,15 @@
             var f = it.splitTotal > 1 ? Math.min(1, it.splitIndex / it.splitTotal) : 0;
             bytesLeft += (it.size || 0) * (1 - f);
           });
-          if (bytesLeft <= 0) return '거의 끝났어요';
           var elapsed = Math.max(0, nowMs() - WORK.phaseStarted);
-          var rate = (WORK.phaseBytes > 0 && elapsed > 2500) ? WORK.phaseBytes / elapsed : 0;
-          var sec = rate > 0 ? (bytesLeft / rate) / 1000 : (bytesLeft / (1024 * 1024)) * EST_S_PER_MB + 3;
-          return '약 ' + fmtDur(sec) + ' (전사 기준)';
+          if (bytesLeft > 0) {
+            var rate = (WORK.phaseBytes > 0 && elapsed > 2500) ? WORK.phaseBytes / elapsed : 0;
+            var sec = rate > 0 ? (bytesLeft / rate) / 1000 : (bytesLeft / (1024 * 1024)) * EST_S_PER_MB + 3;
+            return '약 ' + fmtDur(sec) + ' (전사 기준)';
+          }
+          return '약 ' + fmtDur(20 * chatPending()) + ' (정리 기준)';
         }
-        var left = 0;
-        WORK.queue.forEach(function (it) {
-          if (it.status !== 'done' && it.status !== 'error') left += 1;
-        });
+        var left = chatPending();
         if (!left) return '거의 끝났어요';
         var elapsed2 = Math.max(0, nowMs() - WORK.phaseStarted) / 1000;
         var rate2 = (WORK.phaseItems > 0 && elapsed2 > 1.5) ? WORK.phaseItems / elapsed2 : 0;
@@ -2183,7 +2189,6 @@
               if (it.keysUsed.indexOf(ki.num) === -1) it.keysUsed.push(ki.num);
               recordUsage(ki.value, 'stt', seconds || it.duration || it.size / 2000);
               renderQuotaChip();
-              if (keys.length > 1) noteKeySwitch(ki);
               if (mi > 0) {
                 addNotice("'" + model.name + "' 모델(" + model.id + ')로 자동 전환해 받아쓰기했습니다. 앞선 모델이 한도(429)에 걸렸습니다.');
               }
@@ -2489,7 +2494,7 @@
               var content = choice && choice.message && choice.message.content ? choice.message.content.trim() : '';
               if (!content) throw new Error(label + ' 결과가 비어 있습니다. 잠시 후 다시 시도해 주세요.');
               recordUsage(ki.value, 'chat', 0);
-              if (keys.length > 1) noteKeySwitch(ki);
+              renderQuotaChip();
               return { text: content, model: model, keyNum: ki.num };
             });
           });
@@ -2497,12 +2502,6 @@
         return attemptModel(0);
       }
 
-      function noteKeySwitch(keyInfo) {
-        if (keyInfo.listIndex === activeKey) return false;
-        addNotice(keyInfo.num + '번 키로 작업했습니다.');
-        setActiveKey(keyInfo.listIndex);
-        return true;
-      }
 
       /* ---------- prompts ---------- */
       function isEnglishOut() {
