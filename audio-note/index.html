@@ -2035,7 +2035,7 @@
         phase: '', list: [], queue: [], taken: {},
         workers: [], cool: {}, total: 0,
         sttDone: 0, chatDone: 0,
-        phaseStarted: 0, phaseBytes: 0, phaseItems: 0,
+        phaseStarted: 0, phaseBytes: 0, phaseItems: 0, active: 0,
         startedMs: 0
       };
 
@@ -2054,6 +2054,7 @@
         WORK.phaseStarted = nowMs();
         WORK.phaseBytes = 0;
         WORK.phaseItems = 0;
+        WORK.active = 0;
         var k = Math.max(1, keys.length);
         var n = list.length;
         var base = Math.floor(n / k), rem = n % k;
@@ -3037,6 +3038,18 @@
         });
       }
 
+      var workWaiters = [];
+      function wakeWorkers() {
+        var list = workWaiters;
+        workWaiters = [];
+        list.forEach(function (fn) { fn(); });
+      }
+      function waitWork() {
+        return new Promise(function (res) {
+          workWaiters.push(res);
+          setTimeout(res, 800);
+        });
+      }
       function runWorker(worker, phase) {
         function step() {
           if (!busy) return Promise.resolve();
@@ -3045,17 +3058,24 @@
             worker.state = 'cool';
             renderWorkerStates();
             announceWorkerState();
-            return sleep(Math.min(left, 1500)).then(step);
+            return sleep(Math.min(left, 800)).then(step);
           }
           var it = claim(worker);
           if (!it) {
             worker.state = 'idle';
             renderWorkerStates();
-            return Promise.resolve();
+            /* 다른 키가 아직 일하는 중이면, 그 키가 한도로 놓은 작업을 받기 위해 기다린다. */
+            if (!WORK.active) return Promise.resolve();
+            return waitWork().then(step);
           }
+          WORK.active += 1;
           if (phase === 'stt') it.startedAt = nowMs();
           else it.chatStartedAt = nowMs();
-          return workerTask(worker, phase, it).then(step);
+          return workerTask(worker, phase, it).then(function () {
+            WORK.active -= 1;
+            wakeWorkers();
+            return step();
+          });
         }
         return step();
       }
