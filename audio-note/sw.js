@@ -1,4 +1,4 @@
-const CACHE = 'audio-note-v1';
+const CACHE = 'audio-note-v2';
 const ASSETS = [
   './',
   './index.html',

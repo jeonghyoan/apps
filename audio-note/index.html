@@ -13,53 +13,65 @@
   <style>
     :root {
       color-scheme: light;
-      --bg: #f5f6f8;
+      --bg: #f6f7f9;
       --surface: #ffffff;
-      --surface-2: #fafbfc;
-      --text: #17181b;
+      --surface-2: #f6f7fa;
+      --surface-3: #eceef2;
+      --text: #111214;
       --muted: #6b7280;
-      --line: #e6e7eb;
-      --line-strong: #d6d8dd;
+      --faint: #9097a1;
+      --line: #e7e8ec;
+      --line-strong: #d7dae1;
       --accent: #2563eb;
-      --accent-soft: #eff4ff;
+      --accent-ink: #1d4ed8;
+      --accent-soft: #eef4ff;
+      --accent-line: #cfe0ff;
       --on-accent: #ffffff;
       --danger: #dc2626;
       --danger-soft: #fef2f2;
-      --danger-line: #f3c7c7;
+      --danger-line: #f3c9c9;
       --ok: #15803d;
-      --ok-soft: #eff8f2;
-      --ok-line: #cfe8d8;
+      --ok-soft: #eef9f2;
+      --ok-line: #c9e7d6;
       --warn: #b45309;
-      --warn-line: #f2d7ae;
-      --warn-bg: #fef8ee;
-      --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 10px 28px -18px rgba(16, 24, 40, 0.35);
+      --warn-line: #f0d5a8;
+      --warn-bg: #fdf8ee;
+      --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 18px 44px -34px rgba(16, 24, 40, 0.45);
+      --shadow-pop: 0 10px 30px -12px rgba(16, 24, 40, 0.28);
       --radius: 16px;
+      --radius-sm: 12px;
       --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
     }
     body.dark {
       color-scheme: dark;
-      --bg: #0e1013;
-      --surface: #16181d;
-      --surface-2: #1b1e24;
-      --text: #f1f2f4;
-      --muted: #9aa1ab;
-      --line: #262a31;
-      --line-strong: #363b45;
-      --accent: #3b82f6;
-      --accent-soft: #1a2334;
-      --on-accent: #ffffff;
+      --bg: #0f1115;
+      --surface: #181b21;
+      --surface-2: #1d2129;
+      --surface-3: #262b34;
+      --text: #f2f3f5;
+      --muted: #9aa1ac;
+      --faint: #7b8290;
+      --line: rgba(255, 255, 255, 0.085);
+      --line-strong: rgba(255, 255, 255, 0.16);
+      --accent: #5b95f7;
+      --accent-ink: #8ab4ff;
+      --accent-soft: rgba(91, 149, 247, 0.14);
+      --accent-line: rgba(91, 149, 247, 0.34);
+      --on-accent: #08111f;
       --danger: #f87171;
-      --danger-soft: #241618;
-      --danger-line: #4a2a2a;
+      --danger-soft: rgba(248, 113, 113, 0.12);
+      --danger-line: rgba(248, 113, 113, 0.32);
       --ok: #6fd39a;
-      --ok-soft: #14211a;
-      --ok-line: #27402f;
-      --warn: #f0b072;
-      --warn-line: #453520;
-      --warn-bg: #241d14;
-      --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 34px -20px rgba(0, 0, 0, 0.9);
+      --ok-soft: rgba(111, 211, 154, 0.12);
+      --ok-line: rgba(111, 211, 154, 0.3);
+      --warn: #f0b878;
+      --warn-line: rgba(240, 184, 120, 0.32);
+      --warn-bg: rgba(240, 184, 120, 0.1);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 20px 50px -34px rgba(0, 0, 0, 0.9);
+      --shadow-pop: 0 12px 34px -12px rgba(0, 0, 0, 0.8);
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    [hidden] { display: none !important; }
     html, body { margin: 0; padding: 0; }
     body {
       background: var(--bg);
@@ -71,44 +83,31 @@
     svg { display: block; }
     .ic { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.75; fill: none; stroke-linecap: round; stroke-linejoin: round; }
     .ic-sm { width: 15px; height: 15px; }
-    .ic-lg { width: 22px; height: 22px; }
+    .ic-lg { width: 21px; height: 21px; }
 
-    .page { max-width: 780px; margin: 0 auto; padding: 22px 16px 64px; }
+    /* ---------- shell ---------- */
+    .page { max-width: 760px; margin: 0 auto; padding: 0 14px calc(36px + env(safe-area-inset-bottom)); }
+    @media (min-width: 900px) { .page { max-width: 820px; padding: 0 24px 56px; } }
 
-    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
-    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .topbar {
+      position: sticky; top: 0; z-index: 30;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 10px 0;
+      background: color-mix(in srgb, var(--bg) 90%, transparent);
+      -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+      border-bottom: 1px solid transparent;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
     .brand-mark {
-      width: 40px; height: 40px; flex: none; border-radius: 12px;
+      width: 38px; height: 38px; flex: none; border-radius: 12px;
       background: var(--accent-soft); color: var(--accent);
-      display: grid; place-items: center; border: 1px solid var(--line);
+      display: grid; place-items: center; border: 1px solid var(--accent-line);
     }
-    h1 { margin: 0; font-size: 17px; font-weight: 680; letter-spacing: -0.01em; }
-    .brand-sub { margin: 3px 0 0; font-size: 12.5px; color: var(--muted); }
+    h1 { margin: 0; font-size: 16px; font-weight: 680; letter-spacing: -0.015em; white-space: nowrap; }
+    .brand-sub { margin: 2px 0 0; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    @media (max-width: 430px) { .brand-sub { display: none; } }
 
-    .layout { display: grid; gap: 14px; }
-    .col-side, .col-main { display: grid; gap: 14px; align-content: start; min-width: 0; }
-    @media (min-width: 900px) {
-      .page { max-width: 1040px; padding: 28px 24px 72px; }
-      .layout { grid-template-columns: 340px minmax(0, 1fr); gap: 18px; }
-    }
-
-    .card {
-      background: var(--surface); border: 1px solid var(--line);
-      border-radius: var(--radius); box-shadow: var(--shadow);
-      padding: 16px; min-width: 0;
-    }
-    .card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
-    .card-head h2 {
-      margin: 0; font-size: 13px; font-weight: 650; letter-spacing: 0.005em;
-      display: flex; align-items: center; gap: 7px;
-    }
-    .card-head h2 .ic { color: var(--muted); }
-    .chip {
-      font-size: 11px; font-weight: 600; color: var(--muted);
-      background: var(--surface-2); border: 1px solid var(--line);
-      border-radius: 999px; padding: 3px 8px; white-space: nowrap;
-    }
-
+    .top-actions { display: flex; align-items: center; gap: 6px; flex: none; }
     .icon-btn {
       width: 38px; height: 38px; flex: none; border-radius: 11px;
       border: 1px solid var(--line); background: var(--surface); color: var(--muted);
@@ -116,127 +115,251 @@
       transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
     }
     .icon-btn:hover { background: var(--surface-2); color: var(--text); border-color: var(--line-strong); }
-    .icon-btn.danger:hover { color: var(--danger); }
+    .icon-btn:active { transform: scale(0.97); }
+    .icon-btn[aria-expanded="true"] { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); }
     .icon-btn.sm { width: 28px; height: 28px; border-radius: 8px; border-color: transparent; background: transparent; }
-    .icon-btn.sm:hover { background: var(--surface-2); border-color: var(--line); }
+    .icon-btn.sm:hover { background: var(--surface-3); border-color: transparent; color: var(--text); }
 
-    .top-actions { display: flex; align-items: center; gap: 8px; flex: none; }
     .install-btn {
       display: inline-flex; align-items: center; gap: 6px;
-      height: 38px; padding: 0 13px 0 11px; border-radius: 11px;
+      height: 38px; padding: 0 12px 0 10px; border-radius: 11px;
       border: 1px solid var(--line); background: var(--surface); color: var(--text);
-      font-family: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer;
-      white-space: nowrap;
+      font-family: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; white-space: nowrap;
       transition: background-color 0.15s ease, border-color 0.15s ease;
     }
     .install-btn:hover { background: var(--surface-2); border-color: var(--line-strong); }
     .install-btn .ic { color: var(--accent); }
-    .install-btn[hidden] { display: none; }
-    @media (max-width: 420px) {
+    @media (max-width: 430px) {
       .install-btn { padding: 0; width: 38px; justify-content: center; }
       .install-btn span { display: none; }
     }
 
+    /* ---------- cards ---------- */
+    .stack { display: grid; gap: 12px; margin-top: 6px; }
+    .card {
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 15px; min-width: 0;
+    }
+    @media (min-width: 900px) { .card { padding: 18px; } }
+    .card-title {
+      margin: 0; font-size: 13px; font-weight: 650; letter-spacing: 0.004em;
+      display: flex; align-items: center; gap: 7px; min-width: 0;
+    }
+    .card-title .ic { color: var(--muted); }
+    .chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11px; font-weight: 620; color: var(--muted);
+      background: var(--surface-2); border: 1px solid var(--line);
+      border-radius: 999px; padding: 3px 8px; white-space: nowrap;
+    }
+    body.dark .chip { background: rgba(255, 255, 255, 0.04); }
+    .chip.warn { color: var(--warn); border-color: var(--warn-line); background: var(--warn-bg); }
+    .chip.quiet { background: transparent; }
+    .chip .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+    /* ---------- settings accordion ---------- */
+    .settings { padding: 0; overflow: hidden; scroll-margin-top: 62px; }
+    .settings-head {
+      display: flex; align-items: center; gap: 9px; width: 100%;
+      padding: 11px 12px; border: 0; background: transparent; color: inherit;
+      font-family: inherit; text-align: left; cursor: pointer; min-height: 54px;
+    }
+    .settings-head:hover { background: var(--surface-2); }
+    .settings.open .settings-head { border-bottom: 1px solid var(--line); }
+    .settings-ic {
+      width: 30px; height: 30px; flex: none; border-radius: 9px;
+      background: var(--surface-2); border: 1px solid var(--line);
+      display: grid; place-items: center; color: var(--muted);
+    }
+    .settings.open .settings-ic { color: var(--accent); background: var(--accent-soft); border-color: var(--accent-line); }
+    .settings-title { font-size: 13px; font-weight: 650; flex: none; }
+    .settings-sums { display: flex; align-items: center; gap: 6px; margin-left: auto; min-width: 0; overflow: hidden; }
+    @media (max-width: 400px) { .settings-sums #sumModels { display: none; } }
+    .settings-chev { color: var(--faint); flex: none; transition: transform 0.2s ease; }
+    .settings.open .settings-chev { transform: rotate(180deg); }
+
+    .settings-body {
+      display: grid; grid-template-rows: 0fr; opacity: 0; pointer-events: none;
+      transition: grid-template-rows 0.24s ease, opacity 0.18s ease;
+    }
+    .settings.open .settings-body { grid-template-rows: 1fr; opacity: 1; pointer-events: auto; }
+    .settings-inner { overflow: hidden; min-height: 0; }
+    .settings-panes { padding: 15px 14px 17px; display: grid; gap: 20px; }
+    @media (min-width: 760px) {
+      .settings-panes { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; padding: 18px; }
+    }
+    .pane { min-width: 0; display: grid; gap: 0; align-content: start; }
+    .pane-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 9px; }
+    .pane-title {
+      margin: 0 0 9px; font-size: 12px; font-weight: 650; color: var(--text);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .pane-head .pane-title { margin: 0; }
+    .pane-title .ic { color: var(--muted); }
+
+    /* ---------- form controls ---------- */
     .input, .select {
       width: 100%; border: 1px solid var(--line-strong); background: var(--surface-2);
-      color: var(--text); border-radius: 11px; padding: 11px 12px;
+      color: var(--text); border-radius: var(--radius-sm); padding: 11px 12px;
       font-size: 14px; font-family: inherit; outline: none;
-      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
     }
-    .input::placeholder { color: var(--muted); }
-    .input:focus, .select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    body.dark .input, body.dark .select { background: var(--bg); }
+    .input::placeholder { color: var(--faint); }
+    .input:focus, .select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); background: var(--surface); }
     .input.mono { font-family: var(--mono); font-size: 13px; letter-spacing: 0.01em; }
-
-    .field-row { display: flex; gap: 8px; align-items: center; }
-    .note { margin: 10px 0 0; font-size: 11.5px; line-height: 1.55; color: var(--muted); }
+    .field-label { display: block; font-size: 11.5px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+    .note { margin: 9px 0 0; font-size: 11.5px; line-height: 1.55; color: var(--muted); }
     .note code { font-family: var(--mono); font-size: 11px; }
-
     .select-wrap { position: relative; }
     .select { appearance: none; -webkit-appearance: none; padding-right: 34px; cursor: pointer; }
-    .select-wrap .chev {
-      position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
-      color: var(--muted); pointer-events: none;
-    }
-    .field-label { display: block; font-size: 11.5px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+    .select-wrap .chev { position: absolute; right: 11px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    @media (max-width: 380px) { .grid-2 { grid-template-columns: 1fr; } }
-
-    .seg {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
-      background: var(--surface-2); border: 1px solid var(--line);
-      border-radius: 13px; padding: 5px;
-    }
-    .seg-btn {
-      display: flex; flex-direction: column; gap: 2px; align-items: flex-start;
-      border: 1px solid transparent; background: transparent; color: var(--muted);
-      border-radius: 10px; padding: 9px 10px; cursor: pointer; text-align: left;
-      font-family: inherit; transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-    }
-    .seg-btn .seg-title { font-size: 13.5px; font-weight: 650; }
-    .seg-btn .seg-sub { font-size: 10.5px; font-family: var(--mono); opacity: 0.85; }
-    .seg-btn:hover { color: var(--text); }
-    .seg-btn.active {
-      background: var(--surface); border-color: var(--line-strong); color: var(--text);
-      box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
-    }
-    .seg-btn.active .seg-title { color: var(--accent); }
-    .seg-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-    .seg-btn .seg-sub.txt { font-family: inherit; letter-spacing: 0; }
-
+    @media (max-width: 400px) { .grid-2 { grid-template-columns: 1fr; } }
     .label-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
     .label-row .link-btn { padding: 0; font-size: 11px; }
-    .custom-area { min-height: 84px; line-height: 1.6; resize: vertical; }
-    .hint-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-top: 8px; }
-    .hint-row .note { margin: 0; }
-    .hint-row .chip { flex: none; font-family: var(--mono); }
-
-    .drop {
-      display: flex; flex-direction: column; align-items: center; gap: 8px;
-      border: 1.5px dashed var(--line-strong); border-radius: 13px;
-      background: var(--surface-2); padding: 20px 14px; text-align: center; cursor: pointer;
-      transition: border-color 0.15s ease, background-color 0.15s ease;
+    .link-btn {
+      border: 0; background: transparent; color: var(--muted); font-family: inherit;
+      font-size: 11.5px; font-weight: 600; cursor: pointer; padding: 4px 2px;
+      text-decoration: underline; text-underline-offset: 2px;
     }
+    .link-btn:hover { color: var(--text); }
+    .custom-area { min-height: 78px; line-height: 1.6; resize: vertical; font-size: 13px; }
+    .hint-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-top: 7px; }
+    .hint-row .note { margin: 0; }
+    .hint-row .chip { flex: none; font-family: var(--mono); font-size: 10.5px; }
+
+    /* segmented control */
+    .seg {
+      display: grid; gap: 4px; padding: 4px;
+      background: var(--surface-2); border: 1px solid var(--line); border-radius: 13px;
+    }
+    body.dark .seg { background: var(--bg); }
+    .seg-stt { grid-template-columns: 1fr 1fr; }
+    .seg-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .seg-btn {
+      display: flex; align-items: center; justify-content: center; gap: 4px;
+      border: 1px solid transparent; background: transparent; color: var(--muted);
+      border-radius: 9px; padding: 8px 6px; cursor: pointer; text-align: center;
+      font-family: inherit; font-size: 12.5px; font-weight: 600;
+      transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+      min-height: 38px;
+    }
+    .seg-btn:hover { color: var(--text); }
+    .seg-btn.active {
+      background: var(--surface); color: var(--accent-ink);
+      box-shadow: inset 0 0 0 1px var(--line-strong), 0 1px 2px rgba(16, 24, 40, 0.05);
+    }
+    body.dark .seg-btn.active { color: var(--accent-ink); background: var(--surface); }
+    .seg-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .seg-stt .seg-btn { flex-direction: column; align-items: flex-start; gap: 1px; text-align: left; padding: 9px 10px; }
+    .seg-btn .seg-title { font-size: 13.5px; font-weight: 650; }
+    .seg-btn .seg-sub { font-size: 10.5px; font-family: var(--mono); opacity: 0.8; }
+    .seg-btn.active .seg-title { color: var(--accent-ink); }
+
+    /* keys */
+    .key-form { display: flex; gap: 7px; align-items: stretch; }
+    .key-form .input { flex: 1; min-width: 0; resize: vertical; min-height: 44px; line-height: 1.5; }
+    .key-form .btn { flex: none; height: auto; }
+    .key-list { list-style: none; margin: 9px 0 0; padding: 0; display: grid; gap: 6px; }
+    .key-list:empty { display: none; }
+    .key-row {
+      display: flex; align-items: center; gap: 4px;
+      border: 1px solid var(--line); border-radius: 11px; background: var(--surface-2);
+      padding: 6px 6px 6px 10px;
+    }
+    body.dark .key-row { background: var(--bg); }
+    .key-row.active { border-color: var(--accent-line); background: var(--accent-soft); }
+    .key-pick {
+      display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0;
+      border: 0; background: transparent; color: inherit; font-family: inherit;
+      padding: 3px 0; cursor: pointer; text-align: left;
+    }
+    .key-dot {
+      width: 14px; height: 14px; flex: none; border-radius: 50%;
+      border: 1.75px solid var(--line-strong); display: grid; place-items: center;
+    }
+    .key-row.active .key-dot { border-color: var(--accent); }
+    .key-row.active .key-dot::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+    .key-main { flex: 1; min-width: 0; display: grid; gap: 2px; }
+    .key-line { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+    .key-mask {
+      flex: 1; min-width: 0; font-family: var(--mono); font-size: 12px; letter-spacing: 0.02em;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .key-flag { font-size: 10.5px; font-weight: 650; color: var(--accent-ink); white-space: nowrap; flex: none; }
+    .key-flag.idle { color: var(--muted); font-weight: 550; }
+    .key-meta {
+      font-size: 10.5px; color: var(--muted); line-height: 1.4;
+      overflow: hidden; text-overflow: ellipsis; white-space: normal;
+    }
+
+    /* ---------- drop zone ---------- */
+    .work-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+    .drop {
+      position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+      border: 1.5px dashed var(--line-strong); border-radius: 14px;
+      background: var(--surface-2); padding: 24px 14px; text-align: center; cursor: pointer;
+      transition: border-color 0.16s ease, background-color 0.16s ease, transform 0.1s ease;
+    }
+    body.dark .drop { background: var(--bg); }
     .drop:hover, .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+    .drop:active { transform: scale(0.995); }
     .drop-ic {
-      width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line);
-      background: var(--surface); color: var(--muted); display: grid; place-items: center;
+      width: 42px; height: 42px; border-radius: 13px; border: 1px solid var(--line);
+      background: var(--surface); color: var(--accent); display: grid; place-items: center; margin-bottom: 5px;
     }
     .drop-title { font-size: 13.5px; font-weight: 650; }
     .drop-meta { font-size: 11.5px; color: var(--muted); }
+    @media (max-width: 420px) { .drop { padding: 20px 12px; } .drop-ic { width: 38px; height: 38px; } }
 
-    .file-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; }
+    .file-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 5px; max-height: 176px; overflow-y: auto; }
     .file-list:empty { display: none; }
     .file-row {
-      display: flex; align-items: center; gap: 9px;
+      display: flex; align-items: center; gap: 8px;
       border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2);
-      padding: 8px 8px 8px 11px; font-size: 12.5px;
+      padding: 6px 6px 6px 10px; font-size: 12.5px;
     }
+    body.dark .file-row { background: var(--bg); }
+    .file-row > .ic { color: var(--muted); flex: none; }
     .file-row .fname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; }
     .file-row .fsize { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
     .file-row.big { border-color: var(--warn-line); background: var(--warn-bg); }
     .file-row.big .fsize { color: var(--warn); }
-    .file-tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
-    .link-btn {
-      border: 0; background: transparent; color: var(--muted); font-family: inherit;
-      font-size: 11.5px; font-weight: 600; cursor: pointer; padding: 4px 2px; text-decoration: underline;
-      text-underline-offset: 2px;
-    }
-    .link-btn:hover { color: var(--text); }
+    .file-tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 7px; }
 
-    .btn-primary {
+    /* ---------- control bar ---------- */
+    .controls { display: grid; gap: 9px; margin-top: 13px; }
+    @media (min-width: 620px) { .controls { grid-template-columns: minmax(0, 1fr) auto; align-items: center; } }
+    .btn-run {
       display: flex; align-items: center; justify-content: center; gap: 8px;
-      width: 100%; padding: 13px 16px; margin-top: 14px;
-      border: 1px solid transparent; border-radius: 12px;
+      width: 100%; min-height: 48px; padding: 12px 16px;
+      border: 1px solid var(--accent); border-radius: 13px;
       background: var(--accent); color: var(--on-accent);
       font-family: inherit; font-size: 14.5px; font-weight: 650; cursor: pointer;
-      transition: opacity 0.15s ease, transform 0.1s ease;
+      transition: opacity 0.15s ease, transform 0.1s ease, background-color 0.15s ease;
+      white-space: nowrap;
     }
-    .btn-primary:hover:not(:disabled) { opacity: 0.92; }
-    .btn-primary:active:not(:disabled) { transform: translateY(1px); }
-    .btn-primary:disabled {
-      background: var(--surface-2); color: var(--muted);
-      border-color: var(--line); cursor: default;
+    .btn-run:hover:not(:disabled) { opacity: 0.93; }
+    .btn-run:active:not(:disabled) { transform: translateY(1px); }
+    .btn-run:disabled { background: var(--surface-2); border-color: var(--line); color: var(--faint); cursor: default; }
+    body.dark .btn-run:disabled { background: var(--bg); }
+    @media (min-width: 620px) { .btn-run { width: auto; min-width: 190px; padding-inline: 20px; } }
+
+    /* ---------- progress / status ---------- */
+    .progress { margin-top: 13px; }
+    .progress-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+    .progress-count { font-size: 12px; font-weight: 620; color: var(--text); font-variant-numeric: tabular-nums; }
+    .progress-pct { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+    .progress-track { height: 6px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+    .progress-fill {
+      height: 100%; width: 0%; border-radius: 999px; background: var(--accent);
+      transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
+    .progress-foot { margin-top: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 16px; }
+    .eta { font-size: 11.5px; color: var(--muted); }
+    .eta strong { font-weight: 650; color: var(--text); font-variant-numeric: tabular-nums; }
 
     .status { display: flex; align-items: center; gap: 8px; min-height: 20px; margin-top: 11px;
       font-size: 12.5px; color: var(--muted); line-height: 1.5; }
@@ -249,6 +372,20 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .status.error { color: var(--danger); }
 
+    .quota-row { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+    .quota-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      border: 1px solid var(--line); background: var(--surface-2); color: var(--muted);
+      border-radius: 999px; padding: 5px 10px; font-family: inherit; font-size: 11px; font-weight: 600;
+      cursor: pointer; font-variant-numeric: tabular-nums; max-width: 100%;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    body.dark .quota-chip { background: var(--bg); }
+    .quota-chip:hover { color: var(--text); border-color: var(--line-strong); }
+    .quota-chip .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--ok); flex: none; }
+    .quota-chip.low { color: var(--warn); border-color: var(--warn-line); background: var(--warn-bg); }
+    .quota-chip.low .dot { background: var(--warn); }
+
     .notice {
       display: none; align-items: flex-start; gap: 8px; margin-top: 10px; padding: 9px 11px;
       border: 1px solid var(--warn-line); background: var(--warn-bg); color: var(--warn);
@@ -258,113 +395,85 @@
     .notice .ic { flex: none; margin-top: 1px; }
     .notice span { white-space: pre-line; }
 
-    .key-form { display: flex; gap: 8px; align-items: flex-start; }
-    .key-form .input { flex: 1; min-width: 0; resize: vertical; min-height: 46px; line-height: 1.5; }
-    .key-form .btn { flex: none; height: 40px; }
-    .key-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
-    .key-list:empty { display: none; }
-    .key-row {
-      display: flex; align-items: center; gap: 6px;
-      border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2);
-      padding: 6px 8px 6px 10px;
-    }
-    .key-row.active { border-color: var(--accent); background: var(--accent-soft); }
-    .key-pick {
-      display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0;
-      border: 0; background: transparent; color: inherit; font-family: inherit;
-      padding: 3px 0; cursor: pointer; text-align: left;
-    }
-    .key-dot {
-      width: 14px; height: 14px; flex: none; border-radius: 50%;
-      border: 1.75px solid var(--line-strong); display: grid; place-items: center;
-    }
-    .key-row.active .key-dot { border-color: var(--accent); }
-    .key-row.active .key-dot::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
-    .key-mask {
-      flex: 1; min-width: 0; font-family: var(--mono); font-size: 12px; letter-spacing: 0.02em;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .key-flag { font-size: 10.5px; font-weight: 650; color: var(--accent); white-space: nowrap; }
-    .key-flag.idle { color: var(--muted); font-weight: 550; }
-
-    /* results */
-    .results-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
-    .results-head h2 {
-      margin: 0; font-size: 13px; font-weight: 650;
-      display: flex; align-items: center; gap: 7px;
-    }
-    .results-head h2 .ic { color: var(--muted); }
+    /* ---------- results ---------- */
+    .results-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 11px; flex-wrap: wrap; }
     .results-actions { display: flex; gap: 6px; flex-wrap: wrap; }
     .btn {
-      display: inline-flex; align-items: center; gap: 6px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 5px;
       border: 1px solid var(--line-strong); background: var(--surface); color: var(--text);
-      border-radius: 10px; padding: 8px 10px; font-family: inherit;
-      font-size: 12px; font-weight: 620; cursor: pointer;
-      transition: background-color 0.15s ease, color 0.15s ease;
+      border-radius: 10px; padding: 7px 10px; font-family: inherit;
+      font-size: 12px; font-weight: 620; cursor: pointer; min-height: 34px;
+      transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
     }
     .btn:hover:not(:disabled) { background: var(--surface-2); }
-    .btn:disabled { opacity: 0.45; cursor: default; }
+    .btn:disabled { opacity: 0.42; cursor: default; }
     .btn .ic { color: var(--muted); }
-    .btn.ok { color: var(--accent); border-color: var(--accent); }
-    .btn.ok .ic { color: var(--accent); }
+    .btn.ok { color: var(--accent-ink); border-color: var(--accent-line); background: var(--accent-soft); }
+    .btn.ok .ic { color: var(--accent-ink); }
 
-    .rlist { display: grid; gap: 10px; }
+    .rlist { display: grid; gap: 9px; }
     .empty-results {
       border: 1px dashed var(--line-strong); border-radius: 13px; padding: 26px 16px;
-      text-align: center; color: var(--muted); font-size: 12.5px; line-height: 1.6;
+      text-align: center; color: var(--muted); font-size: 12.5px; line-height: 1.65;
+      display: grid; justify-items: center; gap: 8px;
     }
+    .empty-results .ic { color: var(--faint); }
     .rcard { border: 1px solid var(--line); border-radius: 13px; background: var(--surface-2); overflow: hidden; }
-    .rcard.running { border-color: var(--accent); }
+    body.dark .rcard { background: var(--bg); }
+    .rcard.running { border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-soft); }
     .rhead {
-      display: flex; align-items: center; gap: 10px; width: 100%;
-      padding: 11px 12px; border: 0; background: transparent; color: inherit;
+      display: flex; align-items: center; gap: 9px; width: 100%;
+      padding: 10px 11px; border: 0; background: transparent; color: inherit;
       font-family: inherit; text-align: left; cursor: pointer;
     }
-    .rhead:hover { background: rgba(127, 127, 127, 0.05); }
+    .rhead:hover { background: rgba(127, 127, 127, 0.06); }
     .rhead-main { flex: 1; min-width: 0; display: grid; gap: 3px; }
-    .rtitle { display: flex; align-items: center; gap: 8px; min-width: 0; }
-    .rname { font-size: 13px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .rmeta { font-size: 11px; color: var(--muted); line-height: 1.45; }
+    .rtitle { display: flex; align-items: center; gap: 7px; min-width: 0; }
+    .rname { font-size: 13px; font-weight: 640; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rmeta { font-size: 11px; color: var(--muted); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; }
     .badge {
       display: inline-flex; align-items: center; gap: 5px; flex: none;
       font-size: 10.5px; font-weight: 650; border-radius: 999px; padding: 3px 8px;
       border: 1px solid var(--line); color: var(--muted); background: var(--surface);
     }
     .badge .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
-    .badge.running { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+    .badge.running { color: var(--accent-ink); border-color: var(--accent-line); background: var(--accent-soft); }
     .badge.done { color: var(--ok); border-color: var(--ok-line); background: var(--ok-soft); }
     .badge.error { color: var(--danger); border-color: var(--danger-line); background: var(--danger-soft); }
     .badge.skipped { color: var(--warn); border-color: var(--warn-line); background: var(--warn-bg); }
     .badge.running .dot { animation: pulse 1s ease-in-out infinite; }
     @keyframes pulse { 50% { opacity: 0.25; } }
-    .rchev { color: var(--muted); transition: transform 0.15s ease; flex: none; }
+    .rchev { color: var(--faint); transition: transform 0.18s ease; flex: none; }
     .rcard.open .rchev { transform: rotate(180deg); }
-    .rbody { padding: 0 12px 12px; display: none; }
+    .rbody { padding: 0 11px 11px; display: none; }
     .rcard.open .rbody { display: block; }
     .rbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
     .tabs {
       display: flex; gap: 2px; padding: 3px; background: var(--surface);
-      border: 1px solid var(--line); border-radius: 10px; overflow-x: auto;
+      border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; max-width: 100%;
+      scrollbar-width: none;
     }
+    .tabs::-webkit-scrollbar { display: none; }
     .tab {
       display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
       border: 0; background: transparent; color: var(--muted);
       font-family: inherit; font-size: 11.5px; font-weight: 620;
-      padding: 6px 9px; border-radius: 8px; cursor: pointer;
+      padding: 6px 9px; border-radius: 8px; cursor: pointer; min-height: 30px;
+      transition: background-color 0.15s ease, color 0.15s ease;
     }
     .tab.active { background: var(--surface-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--line); }
-    .tab.active .ic { color: var(--accent); }
-    .tab-num { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+    .tab.active .ic { color: var(--accent-ink); }
+    .tab-num { font-size: 10px; color: var(--faint); font-family: var(--mono); }
     .racc { display: flex; gap: 5px; flex-wrap: wrap; }
-    .racc .btn { padding: 6px 9px; font-size: 11.5px; }
+    .racc .btn { padding: 6px 9px; font-size: 11.5px; min-height: 32px; }
     .output {
       margin-top: 9px; padding: 12px;
-      background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
-      font-size: 13.5px; line-height: 1.7; min-height: 84px; max-height: 46vh; overflow: auto;
+      background: var(--surface); border: 1px solid var(--line); border-radius: 11px;
+      font-size: 13.5px; line-height: 1.72; min-height: 84px; max-height: 46vh; overflow: auto;
       white-space: pre-wrap; word-break: break-word;
     }
     .output.md { white-space: normal; }
-    .output:empty::before { content: "결과가 여기에 표시됩니다."; color: var(--muted); font-size: 12.5px; }
+    .output:empty::before { content: "결과가 여기에 표시됩니다."; color: var(--faint); font-size: 12.5px; }
     .output.md h2, .output.md h3, .output.md h4 { margin: 15px 0 6px; line-height: 1.4; }
     .output.md h2 { font-size: 15px; }
     .output.md h3 { font-size: 14px; }
@@ -384,21 +493,34 @@
       margin: 9px 0; padding: 10px 12px; background: var(--surface-2);
       border: 1px solid var(--line); border-radius: 9px; overflow-x: auto;
     }
-    .output.md pre code {
-      display: block; padding: 0; border: 0; background: transparent;
-      font-size: 12px; line-height: 1.6; white-space: pre;
-    }
+    .output.md pre code { display: block; padding: 0; border: 0; background: transparent; font-size: 12px; line-height: 1.6; white-space: pre; }
     .rmsg { margin-top: 9px; font-size: 12px; line-height: 1.55; color: var(--danger); }
     .rmsg.warn { color: var(--warn); }
 
-    .foot { margin-top: 20px; font-size: 11.5px; line-height: 1.6; color: var(--muted); text-align: center; }
+    .foot { margin: 18px 0 0; font-size: 11.5px; line-height: 1.6; color: var(--muted); text-align: center; }
+
+    /* ---------- toast ---------- */
+    .toast {
+      position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom));
+      transform: translate(-50%, 14px); opacity: 0; pointer-events: none;
+      display: flex; align-items: center; gap: 6px;
+      background: var(--text); color: var(--bg);
+      border-radius: 999px; padding: 10px 16px;
+      font-size: 12.5px; font-weight: 650; white-space: nowrap;
+      box-shadow: var(--shadow-pop); z-index: 90;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .toast .ic { color: var(--ok); }
 
     .icon-sun { display: none; }
     body.dark .icon-sun { display: block; }
     body.dark .icon-moon { display: none; }
 
     :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-    @media (prefers-reduced-motion: reduce) { * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; } }
+    @media (prefers-reduced-motion: reduce) {
+      * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+    }
   </style>
 </head>
 <body>
@@ -415,7 +537,7 @@
         </span>
         <div>
           <h1>오디오 녹음 정리기</h1>
-          <p class="brand-sub">Groq Whisper로 여러 녹음을 한 번에 받아쓰고 정리합니다</p>
+          <p class="brand-sub">받아쓰기 · 요약 · 필기 정리를 한 번에</p>
         </div>
       </div>
       <div class="top-actions">
@@ -428,241 +550,269 @@
           <span>설치</span>
         </button>
         <button class="icon-btn" id="themeBtn" type="button" aria-label="다크 모드 전환">
-        <svg class="ic ic-lg icon-moon" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z"></path>
-        </svg>
-        <svg class="ic ic-lg icon-sun" viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="12" cy="12" r="4"></circle>
-          <path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"></path>
-        </svg>
+          <svg class="ic ic-lg icon-moon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z"></path>
+          </svg>
+          <svg class="ic ic-lg icon-sun" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"></path>
+          </svg>
+        </button>
+        <button class="icon-btn" id="settingsBtn" type="button" aria-label="설정 열기" aria-expanded="false" aria-controls="settingsBody">
+          <svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 7h9M18 7h1"></path>
+            <path d="M5 12h3M12 12h7"></path>
+            <path d="M5 17h9M18 17h1"></path>
+            <circle cx="16" cy="7" r="2.1"></circle>
+            <circle cx="10" cy="12" r="2.1"></circle>
+            <circle cx="16" cy="17" r="2.1"></circle>
+          </svg>
         </button>
       </div>
     </header>
 
-    <div class="layout">
-      <div class="col-side">
-        <section class="card">
-          <div class="card-head">
-            <h2>
-              <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true">
-                <rect x="4" y="10.5" width="16" height="10" rx="2"></rect>
-                <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"></path>
-              </svg>
-              Groq API 키
-            </h2>
-            <span class="chip" id="keyCountChip">0개 등록</span>
-          </div>
-          <div class="key-form">
-            <textarea class="input mono" id="keyInput" rows="2" placeholder="gsk_... (줄바꿈으로 여러 개)" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Groq API 키 입력"></textarea>
-            <button class="btn" id="addKeyBtn" type="button">
-              <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 5v14M5 12h14"></path>
-              </svg>
-              추가
-            </button>
-          </div>
-          <ul class="key-list" id="keyList"></ul>
-          <p class="note">모든 키는 이 기기 브라우저의 localStorage에만 저장되고, 화면에는 끝 4자리만 보이도록 마스킹됩니다. 요청은 <code>api.groq.com</code>으로만 나갑니다.</p>
-          <p class="note">같은 Groq 계정의 키들은 한도를 공유하며, 다른 계정 키를 넣으면 한도 초과 시 자동 전환됩니다.</p>
-        </section>
-
-        <section class="card">
-          <div class="card-head">
-            <h2>
-              <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true">
-                <rect x="3" y="5" width="18" height="14" rx="3"></rect>
-                <path d="M7.5 10h6M7.5 14h9"></path>
-              </svg>
-              모델
-            </h2>
-          </div>
-
-          <span class="field-label">받아쓰기 모델 (Whisper)</span>
-          <div class="seg" id="sttSeg" role="group" aria-label="받아쓰기 모델 선택">
-            <button class="seg-btn active" type="button" data-stt="turbo" aria-pressed="true">
-              <span class="seg-title">빠름</span>
-              <span class="seg-sub">whisper-large-v3-turbo</span>
-            </button>
-            <button class="seg-btn" type="button" data-stt="large" aria-pressed="false">
-              <span class="seg-title">정밀</span>
-              <span class="seg-sub">whisper-large-v3</span>
-            </button>
-          </div>
-          <p class="note">선택한 모델이 한도(429)에 걸리면 파일마다 다른 모델로 자동 전환해 이어서 받아쓰고, 해당 카드에 표시합니다.</p>
-
-          <div style="height:14px"></div>
-
-          <label class="field-label" for="chatModel">요약 모델 (Groq 무료 티어)</label>
-          <div class="select-wrap">
-            <select class="select" id="chatModel">
-              <option value="openai/gpt-oss-120b">GPT-OSS 120B · 기본(최신)</option>
-              <option value="openai/gpt-oss-20b">GPT-OSS 20B · 가볍고 빠름</option>
-              <option value="qwen/qwen3.8-27b">Qwen3.8 27B · 프리뷰</option>
-            </select>
-            <svg class="ic ic-sm chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9.5l6 6 6-6"></path></svg>
-          </div>
-        </section>
-      </div>
-
-      <div class="col-main">
-        <section class="card">
-          <div class="card-head">
-            <h2>
-              <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 15.5V4"></path>
-                <path d="M7.5 8.5L12 4l4.5 4.5"></path>
-                <path d="M5 16.5v1.5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1.5"></path>
-              </svg>
-              녹음 파일
-            </h2>
-            <span class="chip" id="fileCountChip">0개 선택</span>
-          </div>
-
-          <div class="drop" id="drop" role="button" tabindex="0" aria-label="오디오 파일 여러 개 선택">
-            <span class="drop-ic">
-              <svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 16.5V5.5"></path>
-                <path d="M7.5 10L12 5.5 16.5 10"></path>
-                <path d="M4.5 18.5h15"></path>
-              </svg>
-            </span>
-            <span class="drop-title">오디오 파일 선택 (여러 개 가능)</span>
-            <span class="drop-meta">m4a, mp3, wav, ogg, webm, flac · 끌어다 놓아도 됩니다</span>
-          </div>
-          <input type="file" id="fileInput" accept="audio/*,.m4a,.mp3,.wav,.ogg,.webm,.mp4,.flac,.aac,.opus" multiple hidden />
-
-          <ul class="file-list" id="fileList"></ul>
-          <div class="file-tools" id="fileTools" hidden>
-            <button class="link-btn" id="clearFilesBtn" type="button">목록 비우기</button>
-            <span class="chip" id="sizeHint">파일당 최대 25MB</span>
-          </div>
-
-          <div style="height:14px"></div>
-          <div class="grid-2">
-            <div>
-              <label class="field-label" for="langSelect">음성 인식 언어</label>
-              <div class="select-wrap">
-                <select class="select" id="langSelect">
-                  <option value="">자동 감지 (auto)</option>
-                  <option value="ko">한국어 (ko)</option>
-                  <option value="en">영어 (en)</option>
-                  <option value="ja">일본어 (ja)</option>
-                  <option value="zh">중국어 (zh)</option>
-                </select>
-                <svg class="ic ic-sm chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9.5l6 6 6-6"></path></svg>
+    <div class="stack">
+      <section class="card settings" id="settingsCard">
+        <button class="settings-head" id="settingsToggle" type="button" aria-expanded="false" aria-controls="settingsBody">
+          <span class="settings-ic">
+            <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 7h9M18 7h1"></path>
+              <path d="M5 12h3M12 12h7"></path>
+              <path d="M5 17h9M18 17h1"></path>
+              <circle cx="16" cy="7" r="2.1"></circle>
+              <circle cx="10" cy="12" r="2.1"></circle>
+              <circle cx="16" cy="17" r="2.1"></circle>
+            </svg>
+          </span>
+          <span class="settings-title">설정</span>
+          <span class="settings-sums">
+            <span class="chip warn" id="sumKeys">API 키 없음</span>
+            <span class="chip quiet" id="sumModels">빠름 · GPT-OSS 120B</span>
+          </span>
+          <svg class="ic ic-sm settings-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9.5l6 6 6-6"></path></svg>
+        </button>
+        <div class="settings-body" id="settingsBody">
+          <div class="settings-inner">
+            <div class="settings-panes">
+              <div class="pane">
+                <div class="pane-head">
+                  <h2 class="pane-title">
+                    <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true">
+                      <circle cx="8" cy="8" r="3.5"></circle>
+                      <path d="M11.5 8h9M17 8v3.5"></path>
+                      <path d="M4 15.5h6M4 19h10"></path>
+                    </svg>
+                    Groq API 키
+                  </h2>
+                  <span class="chip" id="keyCountChip">0개 등록</span>
+                </div>
+                <div class="key-form">
+                  <textarea class="input mono" id="keyInput" rows="2" placeholder="gsk_... (줄바꿈으로 여러 개)" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Groq API 키 입력"></textarea>
+                  <button class="btn" id="addKeyBtn" type="button">
+                    <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+                    추가
+                  </button>
+                </div>
+                <ul class="key-list" id="keyList"></ul>
+                <p class="note">모든 키는 이 기기 브라우저의 localStorage에만 저장되고, 화면에는 끝 4자리만 보이도록 마스킹됩니다. 요청은 <code>api.groq.com</code>으로만 나갑니다.</p>
+                <p class="note">같은 Groq 계정의 키들은 한도를 공유하며, 다른 계정 키를 넣으면 한도 초과 시 자동 전환됩니다.</p>
               </div>
-            </div>
-            <div>
-              <label class="field-label" for="outLangSelect">요약·필기 출력 언어</label>
-              <div class="select-wrap">
-                <select class="select" id="outLangSelect">
-                  <option value="ko">한국어</option>
-                  <option value="en">English</option>
-                </select>
-                <svg class="ic ic-sm chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9.5l6 6 6-6"></path></svg>
+
+              <div class="pane">
+                <h2 class="pane-title">
+                  <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="4" y="4" width="16" height="16" rx="3"></rect>
+                    <path d="M9 9h6v6H9z"></path>
+                    <path d="M12 4v2M12 18v2M4 12h2M18 12h2"></path>
+                  </svg>
+                  받아쓰기 모델
+                </h2>
+                <div class="seg seg-stt" id="sttSeg" role="group" aria-label="받아쓰기 모델 선택">
+                  <button class="seg-btn active" type="button" data-stt="turbo" aria-pressed="true">
+                    <span class="seg-title">빠름</span>
+                    <span class="seg-sub">whisper-large-v3-turbo</span>
+                  </button>
+                  <button class="seg-btn" type="button" data-stt="large" aria-pressed="false">
+                    <span class="seg-title">정밀</span>
+                    <span class="seg-sub">whisper-large-v3</span>
+                  </button>
+                </div>
+                <p class="note">선택한 모델이 한도(429)에 걸리면 파일마다 다른 모델로 자동 전환해 이어서 받아쓰고, 해당 카드에 표시합니다.</p>
+
+                <div style="height:12px"></div>
+                <label class="field-label" for="chatModel">요약 모델</label>
+                <div class="select-wrap">
+                  <select class="select" id="chatModel">
+                    <option value="openai/gpt-oss-120b">GPT-OSS 120B · 기본</option>
+                    <option value="openai/gpt-oss-20b">GPT-OSS 20B · 가볍고 빠름</option>
+                    <option value="qwen/qwen3.8-27b">Qwen3.8 27B · 프리뷰</option>
+                  </select>
+                  <svg class="ic ic-sm chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9.5l6 6 6-6"></path></svg>
+                </div>
+
+                <div class="grid-2" style="margin-top:12px">
+                  <div>
+                    <label class="field-label" for="langSelect">음성 인식 언어</label>
+                    <div class="select-wrap">
+                      <select class="select" id="langSelect">
+                        <option value="">자동 감지</option>
+                        <option value="ko">한국어 (ko)</option>
+                        <option value="en">영어 (en)</option>
+                        <option value="ja">일본어 (ja)</option>
+                        <option value="zh">중국어 (zh)</option>
+                      </select>
+                      <svg class="ic ic-sm chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9.5l6 6 6-6"></path></svg>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="field-label" for="outLangSelect">출력 언어</label>
+                    <div class="select-wrap">
+                      <select class="select" id="outLangSelect">
+                        <option value="ko">한국어</option>
+                        <option value="en">English</option>
+                      </select>
+                      <svg class="ic ic-sm chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9.5l6 6 6-6"></path></svg>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="height:13px"></div>
+                <div class="label-row">
+                  <label class="field-label" for="customPrompt">요약·필기 지침 (선택)</label>
+                  <button class="link-btn" id="customClearBtn" type="button" hidden>초기화</button>
+                </div>
+                <textarea class="input custom-area" id="customPrompt" rows="3" maxlength="1000" placeholder="예: 코드와 명령어는 코드블록으로, 시험에 나올 부분은 굵게 강조" aria-describedby="customNote"></textarea>
+                <div class="hint-row">
+                  <p class="note" id="customNote">프리셋에 더해 요약·필기 지침으로 전달되고, 이 기기에 자동 저장됩니다.</p>
+                  <span class="chip" id="customCount">0/1000</span>
+                </div>
               </div>
             </div>
           </div>
-          <div style="height:12px"></div>
-          <div>
-            <span class="field-label" id="presetLabel">정리 스타일 프리셋</span>
-            <div class="seg" id="presetSeg" role="group" aria-labelledby="presetLabel">
-              <button class="seg-btn active" type="button" data-mode="general" aria-pressed="true">
-                <span class="seg-title">일반 정리</span>
-                <span class="seg-sub txt">핵심 요약 · 할 일</span>
-              </button>
-              <button class="seg-btn" type="button" data-mode="lecture" aria-pressed="false">
-                <span class="seg-title">강의 필기</span>
-                <span class="seg-sub txt">개념 · 예제 · 복습</span>
-              </button>
-              <button class="seg-btn" type="button" data-mode="meeting" aria-pressed="false">
-                <span class="seg-title">회의록</span>
-                <span class="seg-sub txt">안건 · 결정 · 할 일</span>
-              </button>
-              <button class="seg-btn" type="button" data-mode="raw" aria-pressed="false">
-                <span class="seg-title">받아쓰기만</span>
-                <span class="seg-sub txt">요약 없이 원문만</span>
-              </button>
-            </div>
-          </div>
+        </div>
+      </section>
 
-          <div style="height:12px"></div>
-          <div>
-            <div class="label-row">
-              <label class="field-label" for="customPrompt">커스텀 지침 (선택)</label>
-              <button class="link-btn" id="customClearBtn" type="button" hidden>초기화</button>
-            </div>
-            <textarea class="input custom-area" id="customPrompt" rows="3" maxlength="1000" placeholder="예: 코드와 명령어는 코드블록으로, 시험에 나올 부분은 굵게 강조" aria-describedby="customNote"></textarea>
-            <div class="hint-row">
-              <p class="note" id="customNote">프리셋에 더해 요약·필기 지침으로 그대로 전달되고, 이 기기에 자동 저장되어 다음에도 유지됩니다.</p>
-              <span class="chip" id="customCount">0/1000</span>
-            </div>
-          </div>
+      <section class="card work">
+        <div class="work-head">
+          <h2 class="card-title">
+            <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 15.5V4"></path>
+              <path d="M7.5 8.5L12 4l4.5 4.5"></path>
+              <path d="M5 16.5v1.5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1.5"></path>
+            </svg>
+            녹음 파일
+          </h2>
+          <span class="chip" id="fileCountChip">0개 선택</span>
+        </div>
 
-          <button class="btn-primary" id="runBtn" type="button" disabled>
+        <div class="drop" id="drop" role="button" tabindex="0" aria-label="오디오 파일 여러 개 선택">
+          <span class="drop-ic">
+            <svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 16.5V5.5"></path>
+              <path d="M7.5 10L12 5.5 16.5 10"></path>
+              <path d="M4.5 18.5h15"></path>
+            </svg>
+          </span>
+          <span class="drop-title">오디오 파일 선택</span>
+          <span class="drop-meta">여러 개를 한 번에 · 끌어다 놓아도 됩니다</span>
+          <span class="drop-meta">m4a, mp3, wav, ogg, webm, flac</span>
+        </div>
+        <input type="file" id="fileInput" accept="audio/*,.m4a,.mp3,.wav,.ogg,.webm,.mp4,.flac,.aac,.opus" multiple hidden />
+
+        <ul class="file-list" id="fileList"></ul>
+        <div class="file-tools" id="fileTools" hidden>
+          <button class="link-btn" id="clearFilesBtn" type="button">목록 비우기</button>
+          <span class="chip" id="sizeHint">파일당 최대 25MB</span>
+        </div>
+
+        <div class="controls">
+          <div class="seg seg-4" id="presetSeg" role="group" aria-label="정리 스타일">
+            <button class="seg-btn active" type="button" data-mode="general" aria-pressed="true" title="핵심 요약 · 할 일">일반</button>
+            <button class="seg-btn" type="button" data-mode="lecture" aria-pressed="false" title="개념 · 예제 · 복습">강의</button>
+            <button class="seg-btn" type="button" data-mode="meeting" aria-pressed="false" title="안건 · 결정 · 할 일">회의</button>
+            <button class="seg-btn" type="button" data-mode="raw" aria-pressed="false" title="요약 없이 원문만">받아쓰기</button>
+          </div>
+          <button class="btn-run" id="runBtn" type="button" disabled>
             <svg class="ic" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M6.5 4.5l12 7.5-12 7.5z"></path>
             </svg>
             <span id="runLabel">받아쓰기 · 정리 시작</span>
           </button>
+        </div>
 
-          <div class="status" id="statusText" role="status" aria-live="polite">
-            <span class="spinner"></span>
-            <span id="statusMsg">API 키와 녹음 파일을 넣으면 시작할 수 있어요.</span>
+        <div class="progress" id="progress" hidden>
+          <div class="progress-top">
+            <span class="progress-count" id="progressText">0 / 0 처리 중</span>
+            <span class="progress-pct" id="progressPct">0%</span>
           </div>
-          <div class="notice" id="notice">
+          <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+          <div class="progress-foot">
+            <span class="eta">예상 남은 시간: <strong id="etaValue">계산 중</strong></span>
+          </div>
+        </div>
+
+        <div class="status" id="statusText" role="status" aria-live="polite">
+          <span class="spinner"></span>
+          <span id="statusMsg">API 키와 녹음 파일을 넣으면 시작할 수 있어요.</span>
+        </div>
+        <div class="notice" id="notice">
+          <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="8.5"></circle>
+            <path d="M12 8v4.5"></path>
+            <path d="M12 16h.01"></path>
+          </svg>
+          <span id="noticeMsg"></span>
+        </div>
+        <div class="quota-row">
+          <button class="quota-chip" id="quotaChip" type="button" hidden aria-label="API 키 남은 한도 자세히 보기"></button>
+        </div>
+      </section>
+
+      <section class="card results">
+        <div class="results-head">
+          <h2 class="card-title">
             <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="8.5"></circle>
-              <path d="M12 8v4.5"></path>
-              <path d="M12 16h.01"></path>
+              <path d="M5 6h14M5 11h14M5 16h9"></path>
             </svg>
-            <span id="noticeMsg"></span>
-          </div>
-        </section>
-
-        <section class="card">
-          <div class="results-head">
-            <h2>
+            결과
+            <span class="chip" id="resultCountChip">0개</span>
+          </h2>
+          <div class="results-actions">
+            <button class="btn" id="toggleAllBtn" type="button" disabled>
+              <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9.5l5 5 5-5"></path></svg>
+              <span id="toggleAllLabel">모두 접기</span>
+            </button>
+            <button class="btn" id="saveAllTxtBtn" type="button" disabled>
               <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M5 6h14M5 11h14M5 16h9"></path>
+                <path d="M12 4v11"></path>
+                <path d="M7.5 10.5L12 15l4.5-4.5"></path>
+                <path d="M5 19.5h14"></path>
               </svg>
-              결과
-              <span class="chip" id="resultCountChip">0개</span>
-            </h2>
-            <div class="results-actions">
-              <button class="btn" id="toggleAllBtn" type="button" disabled>
-                <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M7 9.5l5 5 5-5"></path>
-                </svg>
-                <span id="toggleAllLabel">모두 접기</span>
-              </button>
-              <button class="btn" id="saveAllTxtBtn" type="button" disabled>
-                <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 4v11"></path>
-                  <path d="M7.5 10.5L12 15l4.5-4.5"></path>
-                  <path d="M5 19.5h14"></path>
-                </svg>
-                전체 TXT
-              </button>
-              <button class="btn" id="saveAllMdBtn" type="button" disabled>
-                <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 4v11"></path>
-                  <path d="M7.5 10.5L12 15l4.5-4.5"></path>
-                  <path d="M5 19.5h14"></path>
-                </svg>
-                전체 MD
-              </button>
-            </div>
+              TXT
+            </button>
+            <button class="btn" id="saveAllMdBtn" type="button" disabled>
+              <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 4v11"></path>
+                <path d="M7.5 10.5L12 15l4.5-4.5"></path>
+                <path d="M5 19.5h14"></path>
+              </svg>
+              MD
+            </button>
           </div>
-          <div class="rlist" id="resultList"></div>
-        </section>
-      </div>
+        </div>
+        <div class="rlist" id="resultList"></div>
+      </section>
     </div>
 
     <p class="foot">
       오디오와 API 키는 Groq로만 전송되며, 이 페이지는 어떤 서버에도 저장하지 않습니다.<br />
       결과는 기기에만 남습니다.
     </p>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite">
+    <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"></path></svg>
+    <span id="toastText"></span>
   </div>
 
   <script>
@@ -686,7 +836,10 @@
         lang: 'audio_note_lang',
         outLang: 'audio_note_out_lang',
         mode: 'audio_note_mode',
-        custom: 'audio_note_custom_prompt'
+        custom: 'audio_note_custom_prompt',
+        settings: 'audio_note_settings_open',
+        quota: 'audio_note_quota',
+        usage: 'audio_note_usage'
       };
 
       var $ = function (id) { return document.getElementById(id); };
@@ -703,17 +856,211 @@
       var resultList = $('resultList'), resultCountChip = $('resultCountChip');
       var saveAllTxtBtn = $('saveAllTxtBtn'), saveAllMdBtn = $('saveAllMdBtn');
       var toggleAllBtn = $('toggleAllBtn'), toggleAllLabel = $('toggleAllLabel');
+      var settingsCard = $('settingsCard'), settingsToggle = $('settingsToggle'), settingsBtn = $('settingsBtn');
+      var sumKeys = $('sumKeys'), sumModels = $('sumModels');
+      var progressWrap = $('progress'), progressText = $('progressText'), progressPct = $('progressPct');
+      var progressFill = $('progressFill'), etaValue = $('etaValue');
+      var quotaChip = $('quotaChip');
+      var toastEl = $('toast'), toastText = $('toastText');
 
       var items = [];
       var seq = 0;
       var sttChoice = 'turbo';
       var busy = false;
       var allCollapsed = false;
+      var settingsOpen = false;
+      var settingsPinned = false;
 
       /* ---------- storage ---------- */
       function read(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
       function write(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } }
       function drop2(k) { try { localStorage.removeItem(k); } catch (e) { /* ignore */ } }
+
+      /* ---------- toast / settings accordion ---------- */
+      var toastTimer = 0;
+      function showToast(msg) {
+        if (!toastEl) return;
+        toastText.textContent = msg;
+        toastEl.classList.add('show');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 1700);
+      }
+      function setSettings(open, persist) {
+        settingsOpen = !!open;
+        if (settingsCard) settingsCard.classList.toggle('open', settingsOpen);
+        if (settingsToggle) settingsToggle.setAttribute('aria-expanded', settingsOpen ? 'true' : 'false');
+        if (settingsBtn) {
+          settingsBtn.setAttribute('aria-expanded', settingsOpen ? 'true' : 'false');
+          settingsBtn.setAttribute('aria-label', settingsOpen ? '설정 닫기' : '설정 열기');
+        }
+        if (persist) { settingsPinned = true; write(LS.settings, settingsOpen ? '1' : '0'); }
+      }
+      function revealSettings() {
+        if (!settingsOpen) setSettings(true, true);
+        if (settingsCard) {
+          try { settingsCard.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+          catch (e) { settingsCard.scrollIntoView(); }
+        }
+      }
+      if (settingsToggle) settingsToggle.addEventListener('click', function () { setSettings(!settingsOpen, true); });
+      if (settingsBtn) settingsBtn.addEventListener('click', function () { setSettings(!settingsOpen, true); });
+      if (quotaChip) quotaChip.addEventListener('click', revealSettings);
+
+      /* ---------- quota / local usage ---------- */
+      function fmtNum(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+      function hashKey(v) {
+        var s = String(v), h = 5381, i;
+        for (i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+        return 'k' + h.toString(36);
+      }
+      function todayStr() {
+        var d = new Date();
+        return d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate());
+      }
+      function usageAll() {
+        var raw = read(LS.usage), obj = null;
+        if (raw) { try { obj = JSON.parse(raw); } catch (e) { obj = null; } }
+        if (!obj || typeof obj !== 'object') obj = {};
+        return obj;
+      }
+      function usageToday(keyValue) {
+        var day = usageAll()[todayStr()];
+        var rec = day ? day[hashKey(keyValue)] : null;
+        return { req: rec && rec.req ? rec.req : 0, sec: rec && rec.sec ? rec.sec : 0 };
+      }
+      function recordUsage(keyValue, kind, seconds) {
+        var all = usageAll(), day = todayStr(), id = hashKey(keyValue);
+        if (!all[day]) all[day] = {};
+        var rec = all[day][id] || { req: 0, sec: 0 };
+        rec.req += 1;
+        if (kind === 'stt' && seconds > 0) rec.sec += Math.round(seconds);
+        all[day][id] = rec;
+        var days = Object.keys(all).sort();
+        while (days.length > 14) { delete all[days.shift()]; }
+        write(LS.usage, JSON.stringify(all));
+        if (typeof renderKeys === 'function') renderKeys();
+        return rec;
+      }
+      function saveQuota() {
+        var obj = {};
+        keys.forEach(function (k) {
+          if (k.quota || k.quotas) obj[hashKey(k.value)] = { quota: k.quota || null, quotas: k.quotas || null };
+        });
+        write(LS.quota, JSON.stringify(obj));
+      }
+      function loadQuota() {
+        var raw = read(LS.quota), obj = null;
+        if (raw) { try { obj = JSON.parse(raw); } catch (e) { obj = null; } }
+        if (!obj || typeof obj !== 'object') return;
+        keys.forEach(function (k) {
+          var rec = obj[hashKey(k.value)];
+          if (!rec || typeof rec !== 'object') return;
+          if (rec.quota && typeof rec.quota === 'object') k.quota = rec.quota;
+          if (rec.quotas && typeof rec.quotas === 'object') k.quotas = rec.quotas;
+        });
+      }
+      function quotaLine(k, compact) {
+        var q = k && k.quota, now = Date.now(), head = '';
+        if (q && now - (q.at || 0) < 15 * 60 * 1000) {
+          var parts = [];
+          if (q.rem != null && q.lim != null) parts.push('남은 요청 ' + fmtNum(q.rem) + ' / ' + fmtNum(q.lim));
+          else if (q.rem != null) parts.push('남은 요청 ' + fmtNum(q.rem));
+          if (q.trem != null && q.tlim != null) parts.push('토큰 ' + fmtNum(q.trem) + ' / ' + fmtNum(q.tlim));
+          if (parts.length) head = (q.model ? q.model + ' · ' : '') + parts.join(' · ');
+        }
+        var u = usageToday(k ? k.value : '');
+        var usageTxt = '오늘 사용 ' + u.req + '건' + (u.sec >= 30 ? ' · ' + Math.max(1, Math.round(u.sec / 60)) + '분' : '');
+        if (head) return u.req > 0 ? head + (compact ? ' · 오늘 ' + u.req + '건' : ' · ' + usageTxt) : head;
+        return usageTxt;
+      }
+      function renderQuotaChip() {
+        if (!quotaChip) return;
+        var k = keys[activeKey];
+        if (!k) { quotaChip.hidden = true; quotaChip.textContent = ''; return; }
+        quotaChip.hidden = false;
+        var q = k.quota;
+        var low = !!(q && q.lim && q.rem != null && (Date.now() - (q.at || 0)) < 15 * 60 * 1000 && (q.rem / q.lim) < 0.1);
+        quotaChip.classList.toggle('low', low);
+        quotaChip.innerHTML = '<span class="dot"></span>' +
+          escapeHtml((keys.length > 1 ? (activeKey + 1) + '번 키 · ' : '') + quotaLine(k, true));
+      }
+      function noteRateLimit(keyInfo, res, modelLabel) {
+        var h = res && res.headers;
+        if (!h || typeof h.get !== 'function') { renderQuotaChip(); return; }
+        var rem = h.get('x-ratelimit-remaining-requests');
+        var lim = h.get('x-ratelimit-limit-requests');
+        var trem = h.get('x-ratelimit-remaining-tokens');
+        var tlim = h.get('x-ratelimit-limit-tokens');
+        if (rem === null && lim === null && trem === null && tlim === null) { renderQuotaChip(); return; }
+        var target = keys[keyInfo.listIndex] || keyInfo;
+        var q = {};
+        if (rem !== null) q.rem = parseInt(rem, 10);
+        if (lim !== null) q.lim = parseInt(lim, 10);
+        if (trem !== null) q.trem = parseInt(trem, 10);
+        if (tlim !== null) q.tlim = parseInt(tlim, 10);
+        q.model = modelLabel || '';
+        q.at = Date.now();
+        if (!target.quotas || typeof target.quotas !== 'object') target.quotas = {};
+        target.quotas[modelLabel || ''] = q;
+        target.quota = q;
+        keyInfo.quota = q;
+        saveQuota();
+        renderKeys();
+        renderQuotaChip();
+      }
+
+      /* ---------- progress / eta ---------- */
+      var runState = { total: 0, queue: [] };
+      var EST_S_PER_MB = 0.9;
+      function nowMs() { return (window.performance && window.performance.now) ? window.performance.now() : Date.now(); }
+      function itemFraction(it) {
+        if (it.status === 'done' || it.status === 'skipped' || it.status === 'error') return 1;
+        if (it.status === 'summarizing') return 0.72;
+        if (it.status === 'transcribing') return 0.32;
+        return 0;
+      }
+      function fmtDur(sec) {
+        sec = Math.max(0, Math.round(sec));
+        if (sec < 10) return '10초 안팎';
+        if (sec < 60) return Math.round(sec / 5) * 5 + '초';
+        var m = Math.floor(sec / 60), s = sec % 60;
+        if (m < 60) return m + '분' + (s >= 10 ? ' ' + s + '초' : '');
+        var h = Math.floor(m / 60);
+        m = m % 60;
+        return h + '시간' + (m ? ' ' + m + '분' : '');
+      }
+      function etaLabel() {
+        var remain = 0, doneBytes = 0, doneMs = 0;
+        runState.queue.forEach(function (it) {
+          if (itemFraction(it) >= 1) {
+            if (it.runMs > 0 && it.size > 0) { doneBytes += it.size; doneMs += it.runMs; }
+          } else {
+            remain += it.size;
+          }
+        });
+        if (!remain) return '거의 끝났어요';
+        if (doneBytes > 0) return '약 ' + fmtDur(remain * (doneMs / doneBytes) / 1000);
+        var guess = (remain / (1024 * 1024)) * EST_S_PER_MB + 3;
+        if (guess < 15) return '계산 중';
+        return '계산 중 (약 ' + fmtDur(guess) + ')';
+      }
+      function updateProgressBar() {
+        if (!progressWrap) return;
+        var active = busy && runState.total > 0;
+        progressWrap.hidden = !active;
+        if (!active) return;
+        var sum = 0, done = 0;
+        runState.queue.forEach(function (it) {
+          var f = itemFraction(it);
+          sum += f;
+          if (f >= 1) done += 1;
+        });
+        var pct = Math.max(3, Math.min(100, Math.round((sum / runState.total) * 100)));
+        progressFill.style.width = pct + '%';
+        progressPct.textContent = pct + '%';
+        progressText.textContent = done + ' / ' + runState.total + ' 처리 중';
+        if (etaValue) etaValue.textContent = etaLabel();
+      }
 
       /* ---------- theme ---------- */
       var themeMeta = document.querySelector('meta[name="theme-color"]');
@@ -791,12 +1138,17 @@
         keys.forEach(function (k, i) {
           var li = document.createElement('li');
           li.className = 'key-row' + (i === activeKey ? ' active' : '');
-          var flag = i === activeKey ? '사용 중 (' + (i + 1) + '/' + keys.length + ')' : (i + 1) + '번 대기';
+          var flag = i === activeKey ? '사용 중' : (i + 1) + '번 대기';
           li.innerHTML =
             '<button class="key-pick" type="button" data-pick="' + i + '" aria-pressed="' + (i === activeKey ? 'true' : 'false') + '" aria-label="' + (i + 1) + '번 키를 사용 키로 선택">' +
               '<span class="key-dot"></span>' +
-              '<span class="key-mask">' + escapeHtml(maskKey(k.value)) + '</span>' +
-              '<span class="key-flag' + (i === activeKey ? '' : ' idle') + '">' + escapeHtml(flag) + '</span>' +
+              '<span class="key-main">' +
+                '<span class="key-line">' +
+                  '<span class="key-mask">' + escapeHtml(maskKey(k.value)) + '</span>' +
+                  '<span class="key-flag' + (i === activeKey ? '' : ' idle') + '">' + escapeHtml(flag) + '</span>' +
+                '</span>' +
+                '<span class="key-meta">' + escapeHtml(quotaLine(k)) + '</span>' +
+              '</span>' +
             '</button>' +
             '<button class="icon-btn sm" type="button" data-del="' + i + '" aria-label="' + (i + 1) + '번 키 삭제">' +
               '<svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>' +
@@ -804,7 +1156,16 @@
           keyList.appendChild(li);
         });
         keyCountChip.textContent = keys.length + '개 등록';
+        renderSettingsSummary();
+        renderQuotaChip();
         updateRunButton();
+      }
+      function renderSettingsSummary() {
+        if (sumKeys) {
+          sumKeys.textContent = keys.length ? 'API 키 ' + keys.length + '개 등록' : 'API 키 없음';
+          sumKeys.classList.toggle('warn', keys.length === 0);
+        }
+        if (sumModels) sumModels.textContent = STT[sttChoice].name + ' · ' + prettyModel(chatModel.value);
       }
       function addKeysFromText(text) {
         var parts = String(text).split(/[\s,]+/);
@@ -819,7 +1180,11 @@
           keys.push({ id: 'k' + keySeq, value: v });
           added += 1;
         });
-        if (added) { persistKeys(); renderKeys(); }
+        if (added) {
+          persistKeys();
+          renderKeys();
+          if (!settingsPinned && settingsOpen && keys.length > 0) setSettings(false, false);
+        }
         return { added: added, dup: dup };
       }
       addKeyBtn.addEventListener('click', function () {
@@ -861,6 +1226,7 @@
           btn.setAttribute('aria-pressed', on ? 'true' : 'false');
         });
         if (persist) write(LS.stt, sttChoice);
+        renderSettingsSummary();
       }
       sttSeg.addEventListener('click', function (e) {
         var btn = e.target.closest ? e.target.closest('.seg-btn') : null;
@@ -871,7 +1237,7 @@
 
       var savedChat = read(LS.chat);
       if (savedChat && chatModel.querySelector('option[value="' + savedChat + '"]')) chatModel.value = savedChat;
-      chatModel.addEventListener('change', function () { write(LS.chat, chatModel.value); });
+      chatModel.addEventListener('change', function () { write(LS.chat, chatModel.value); renderSettingsSummary(); });
 
       var savedLang = read(LS.lang);
       if (savedLang !== null && langSelect.querySelector('option[value="' + savedLang + '"]')) langSelect.value = savedLang;
@@ -892,6 +1258,7 @@
           btn.setAttribute('aria-pressed', on ? 'true' : 'false');
         });
         if (persist) write(LS.mode, modeChoice);
+        updateRunButton();
       }
       presetSeg.addEventListener('click', function (e) {
         var btn = e.target.closest ? e.target.closest('.seg-btn') : null;
@@ -972,6 +1339,29 @@
       }
 
       /* ---------- file queue ---------- */
+      function probeDuration(it) {
+        if (!it || it.duration || it.probing) return;
+        var url = '';
+        try { url = URL.createObjectURL(it.file); } catch (e) { return; }
+        it.probing = true;
+        var a = document.createElement('audio');
+        var settled = false;
+        function done(sec) {
+          if (settled) return;
+          settled = true;
+          it.probing = false;
+          if (sec && isFinite(sec) && sec > 0) {
+            it.duration = sec;
+            updateCard(it);
+          }
+          try { URL.revokeObjectURL(url); } catch (e) { /* ignore */ }
+        }
+        a.preload = 'metadata';
+        a.addEventListener('loadedmetadata', function () { done(a.duration); });
+        a.addEventListener('error', function () { done(0); });
+        setTimeout(function () { done(a.duration); }, 5000);
+        a.src = url;
+      }
       function createItem(file) {
         seq += 1;
         return {
@@ -991,7 +1381,11 @@
           sttFallback: false,
           chatUsed: '',
           notesBusy: false,
-          open: true
+          open: true,
+          duration: 0,
+          probing: false,
+          runMs: 0,
+          startedAt: 0
         };
       }
       function statusTextOf(it) {
@@ -1018,7 +1412,9 @@
             return it.name === f.name && it.size === f.size && it.file.lastModified === f.lastModified;
           });
           if (dup) return;
-          items.push(createItem(f));
+          var it1 = createItem(f);
+          items.push(it1);
+          probeDuration(it1);
           added += 1;
         });
         if (added) {
@@ -1104,16 +1500,19 @@
           runLabel.textContent = '처리 중...';
         } else if (items.length && n === 0) {
           runLabel.textContent = '모두 완료';
+        } else if (modeChoice === 'raw') {
+          runLabel.textContent = n <= 1 ? '받아쓰기 시작' : n + '개 받아쓰기 시작';
         } else if (n <= 1) {
           runLabel.textContent = '받아쓰기 · 정리 시작';
         } else {
-          runLabel.textContent = n + '개 파일 받아쓰기 · 정리 시작';
+          runLabel.textContent = n + '개 받아쓰기 · 정리 시작';
         }
         var has = doneItems().length > 0;
         saveAllTxtBtn.disabled = !has;
         saveAllMdBtn.disabled = !has;
         toggleAllBtn.disabled = items.length === 0;
         resultCountChip.textContent = items.length + '개';
+        renderQuotaChip();
       }
       function setStatus(msg, isBusy, isError) {
         statusMsg.textContent = msg;
@@ -1201,10 +1600,11 @@
             var model = STT[models[mi]];
             it.status = 'transcribing';
             it.error = '';
-            renderResults();
+            updateCard(it);
             setStatus('받아쓰기 중 · ' + it.name + ' · ' + model.name + (ks.length > 1 ? ' · ' + keyInfo.num + '번 키' : ''), true, false);
 
             return sttRequest(keyInfo.value, it.file, model.id, lang).then(function (res) {
+              noteRateLimit(keyInfo, res, model.name);
               if (res.status === 429) return attemptModel(mi + 1);
               if (!res.ok) {
                 return friendlyError(res, '받아쓰기').then(function (msg) { throw new Error(msg); });
@@ -1215,6 +1615,8 @@
                 it.sttUsed = models[mi];
                 it.sttFallback = mi > 0;
                 it.keyNum = keyInfo.num;
+                recordUsage(keyInfo.value, 'stt', it.duration || it.size / 2000);
+                renderQuotaChip();
                 if (ks.length > 1) noteKeySwitch(keyInfo);
                 if (mi > 0) {
                   addNotice("'" + model.name + "' 모델(" + model.id + ')로 자동 전환해 받아쓰기했습니다. 앞선 모델이 한도(429)에 걸렸습니다.');
@@ -1286,6 +1688,7 @@
             setStatus(label + ' 중 · ' + prettyModel(model) + (ks.length > 1 ? ' · ' + keyInfo.num + '번 키' : ''), true, false);
 
             function handle(res) {
+              noteRateLimit(keyInfo, res, prettyModel(model));
               if (res.status === 429) {
                 if (mi + 1 < models.length) {
                   addNotice("'" + prettyModel(model) + "' 모델 한도(429)에 걸려 '" + prettyModel(models[mi + 1]) + "' 모델로 전환합니다.");
@@ -1299,6 +1702,7 @@
                 var choice = data && data.choices && data.choices[0];
                 var content = choice && choice.message && choice.message.content ? choice.message.content.trim() : '';
                 if (!content) throw new Error(label + ' 결과가 비어 있습니다. 잠시 후 다시 시도해 주세요.');
+                recordUsage(keyInfo.value, 'chat', 0);
                 if (ks.length > 1) noteKeySwitch(keyInfo);
                 return { text: content, model: model, keyNum: keyInfo.num };
               });
@@ -1398,6 +1802,7 @@
 
         var badge = '<span class="badge ' + statusClass(it) + '"><span class="dot"></span>' + statusTextOf(it) + '</span>';
         var metaParts = [humanSize(it.size)];
+        if (it.duration > 0) metaParts.push(fmtDur(it.duration));
         if (it.sttUsed) {
           metaParts.push('받아쓰기 ' + STT[it.sttUsed].name + ' (' + STT[it.sttUsed].short + ')' +
             (it.sttFallback ? ' 자동 전환' : '') +
@@ -1492,13 +1897,26 @@
         if (!items.length) {
           var empty = document.createElement('div');
           empty.className = 'empty-results';
-          empty.textContent = '오디오 파일을 고르면 파일마다 카드가 생기고, 받아쓰기 · 요약 · 필기 정리가 카드 안에 쌓입니다.';
+          empty.innerHTML =
+            '<svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 11h14M5 16h9"></path></svg>' +
+            '<span>오디오 파일을 고르면 파일마다 카드가 생기고,<br />받아쓰기 · 요약 · 필기 정리가 카드 안에 쌓입니다.</span>';
           resultList.appendChild(empty);
           updateRunButton();
+          updateProgressBar();
           return;
         }
         items.forEach(function (it) { resultList.appendChild(cardElement(it)); });
         updateRunButton();
+        updateProgressBar();
+      }
+
+      function updateCard(it) {
+        var old = resultList.querySelector('.rcard[data-id="' + it.id + '"]');
+        if (!old) { renderResults(); return; }
+        var fresh = cardElement(it);
+        old.parentNode.replaceChild(fresh, old);
+        updateRunButton();
+        updateProgressBar();
       }
 
       resultList.addEventListener('click', function (e) {
@@ -1523,7 +1941,7 @@
           if (it.tab === 'notes' && !it.notes && it.transcript && !it.notesBusy && !busy) {
             buildNotes(it);
           }
-          renderResults();
+          updateCard(it);
           return;
         }
         if (act === 'copy') {
@@ -1533,6 +1951,7 @@
           function done() {
             el.classList.add('ok');
             if (labelEl) labelEl.textContent = '복사됨';
+            showToast('복사됨 ✓');
             setTimeout(function () {
               el.classList.remove('ok');
               if (labelEl) labelEl.textContent = '복사';
@@ -1550,6 +1969,7 @@
           if (!body) return;
           var tabLabel = it.tab === 'transcript' ? '받아쓰기' : it.tab === 'notes' ? '필기정리' : '요약';
           downloadText(body, it.base + '_' + tabLabel, act);
+          showToast(act.toUpperCase() + ' 파일로 저장했어요');
         }
       });
 
@@ -1622,10 +2042,12 @@
       saveAllTxtBtn.addEventListener('click', function () {
         var text = combinedText('txt');
         if (text) downloadText(text, '오디오정리_' + stamp(), 'txt');
+        if (text) showToast('TXT 파일로 저장했어요');
       });
       saveAllMdBtn.addEventListener('click', function () {
         var text = combinedText('md');
         if (text) downloadText(text, '오디오정리_' + stamp(), 'md');
+        if (text) showToast('MD 파일로 저장했어요');
       });
 
       /* ---------- notes per file ---------- */
@@ -1638,11 +2060,11 @@
           it.notes = res.text;
           it.status = 'done';
           it.error = '';
-          renderResults();
+          updateCard(it);
           setStatus('필기 정리를 만들었습니다 · ' + it.name, false, false);
         }).catch(function (err) {
           it.error = err.message;
-          renderResults();
+          updateCard(it);
           setStatus(err.message, false, true);
         }).then(function () {
           it.notesBusy = false;
@@ -1665,7 +2087,7 @@
         if (it.big) {
           it.status = 'skipped';
           it.error = '25MB를 넘어 이 파일만 건너뛰었습니다. 나누어 올리거나 용량을 줄여 주세요.';
-          renderResults();
+          updateCard(it);
           return Promise.resolve();
         }
 
@@ -1677,26 +2099,26 @@
           if (mode === 'raw') {
             it.tab = 'transcript';
             it.status = 'done';
-            renderResults();
+            updateCard(it);
             return null;
           }
           it.status = 'summarizing';
           it.tab = 'summary';
-          renderResults();
+          updateCard(it);
           setStatus('정리 중 · ' + it.name, true, false);
           return askModel(keyOrder(), summaryPrompt(mode) + customDirective(), text, '정리하는').then(function (res) {
             it.summary = res.text;
             it.chatUsed = res.model;
             it.chatKeyNum = res.keyNum;
             it.status = 'done';
-            renderResults();
+            updateCard(it);
             return null;
           });
         }).catch(function (err) {
           it.status = 'error';
           it.error = err.message;
           if (it.transcript) it.tab = 'transcript';
-          renderResults();
+          updateCard(it);
         });
       }
 
@@ -1708,7 +2130,10 @@
         busy = true;
         hideNotice();
         saveCustom();
+        runState = { total: queue.length, queue: queue };
+        queue.forEach(function (it) { it.runMs = 0; it.startedAt = 0; });
         updateRunButton();
+        updateProgressBar();
 
         var index = 0;
         var okCount = 0, skipCount = 0, errCount = 0;
@@ -1718,20 +2143,27 @@
         function next() {
           if (index >= queue.length) {
             busy = false;
+            runState = { total: 0, queue: [] };
+            updateProgressBar();
             updateRunButton();
             var parts = [queue.length + '개 중 ' + okCount + '개 완료'];
             if (skipCount) parts.push(skipCount + '개 건너뜀');
             if (errCount) parts.push(errCount + '개 오류');
             setStatus(parts.join(' · '), false, errCount > 0);
+            if (okCount) showToast(okCount + '개 파일 정리 완료');
             return;
           }
           var it = queue[index];
           index += 1;
+          it.startedAt = nowMs();
+          updateProgressBar();
           setStatus('(' + index + '/' + queue.length + ') ' + it.name, true, false);
           processItem(it).then(function () {
+            if (it.startedAt) { it.runMs = Math.max(0, nowMs() - it.startedAt); it.startedAt = 0; }
             if (it.status === 'done') okCount += 1;
             else if (it.status === 'skipped') skipCount += 1;
             else errCount += 1;
+            updateProgressBar();
             return next();
           });
         }
@@ -1741,10 +2173,15 @@
 
       /* ---------- boot ---------- */
       loadKeys();
+      loadQuota();
+      var savedSettings = read(LS.settings);
+      settingsPinned = savedSettings !== null;
+      setSettings(savedSettings === null ? keys.length === 0 : savedSettings === '1', false);
       renderKeys();
       renderFileList();
       renderResults();
       updateRunButton();
+      updateProgressBar();
     })();
   </script>
   <script>
