@@ -867,11 +867,11 @@
       };
       var CHAT_FALLBACK = 'openai/gpt-oss-20b';
       var CHAT_FALLBACK2 = 'openai/gpt-oss-120b';
-      var MAX_BYTES = 400 * 1024; /* TEMP TEST */
+      var MAX_BYTES = 25 * 1024 * 1024;
       /* 25MB를 넘는 파일은 16kHz 모노 16bit PCM WAV로 다시 인코딩해 나눈다.
          16kHz x 1ch x 16bit = 32,000 bytes/s → 10분 = 19.2MB (항상 24MB 이하). */
       var SPLIT_RATE = 16000;
-      var SPLIT_SECONDS = 60; /* TEMP TEST */
+      var SPLIT_SECONDS = 600;
       var SPLIT_MAX_BYTES = 24 * 1024 * 1024;
       /* 대용량: ffmpeg(single-thread core)는 ./ffmpeg/ 에서 서빙하고 첫 사용 때만 내려받는다.
          GitHub Pages는 COOP/COEP 헤더를 못 넣으므로 멀티스레드 core-mt는 쓸 수 없다. */
