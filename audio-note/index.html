@@ -264,8 +264,6 @@
     .seg-btn .seg-title { font-size: 13.5px; font-weight: 650; }
     .seg-btn .seg-sub { font-size: 10.5px; font-family: var(--mono); opacity: 0.8; }
     .seg-btn.active .seg-title { color: var(--accent-ink); }
-    .seg-speed { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-    .seg-speed .seg-btn { font-family: var(--mono); font-size: 12px; }
     .range { -webkit-appearance: none; appearance: none; width: 100%; height: 30px; background: transparent; padding: 0; }
     .range::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); }
     .range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; margin-top: -8px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); box-shadow: 0 1px 3px rgba(16, 24, 40, 0.25); }
@@ -603,7 +601,6 @@
           <span class="settings-title">설정</span>
           <span class="settings-sums">
             <span class="chip warn" id="sumKeys">API 키 없음</span>
-            <span class="chip quiet" id="sumSpeed" hidden>1.5x 배속</span>
             <span class="chip quiet" id="sumModels">빠름 · GPT-OSS 120B</span>
           </span>
           <svg class="ic ic-sm settings-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9.5l6 6 6-6"></path></svg>
@@ -632,7 +629,7 @@
                 </div>
                 <ul class="key-list" id="keyList"></ul>
                 <p class="note">모든 키는 이 기기 브라우저의 localStorage에만 저장되고, 화면에는 끝 4자리만 보이도록 마스킹됩니다. 요청은 <code>api.groq.com</code>으로만 나갑니다.</p>
-                <p class="note">키를 2개 이상 넣으면 파일을 키 수만큼 나눠 동시에 전사하고, 먼저 끝난 키가 남은 작업을 가져옵니다. 전사가 모두 끝나면 정리를 다시 나눠 병렬로 처리합니다.</p>
+                <p class="note">키를 2개 이상 넣으면 파일을 키 수만큼 나눠 동시에 전사하고, 파일 하나가 여러 조각이면 그 조각들도 키들이 나눠 동시에 올립니다. 전사가 모두 끝나면 정리를 다시 나눠 병렬로 처리합니다.</p>
                 <p class="note">같은 Groq 계정의 키들은 한도를 공유하며, 다른 계정 키를 넣으면 한도 초과 시 자동 전환됩니다.</p>
               </div>
 
@@ -658,23 +655,10 @@
                 <p class="note">선택한 모델이 한도(429)에 걸리면 파일마다 다른 모델로 자동 전환해 이어서 받아쓰고, 해당 카드에 표시합니다.</p>
 
                 <div class="label-row" style="margin-top:13px">
-                  <label class="field-label" for="speedRange">음성 배속 (실제 강의 가속)</label>
-                  <span class="chip" id="speedChip">1.0x</span>
-                </div>
-                <input class="range" type="range" id="speedRange" min="1" max="2" step="0.05" value="1" aria-describedby="speedNote" />
-                <div class="seg seg-speed" id="speedSeg" role="group" aria-label="배속 빠른 선택">
-                  <button class="seg-btn active" type="button" data-speed="1" aria-pressed="true">1.0x</button>
-                  <button class="seg-btn" type="button" data-speed="1.25" aria-pressed="false">1.25x</button>
-                  <button class="seg-btn" type="button" data-speed="1.5" aria-pressed="false">1.5x</button>
-                  <button class="seg-btn" type="button" data-speed="2" aria-pressed="false">2.0x</button>
-                </div>
-                <p class="note" id="speedNote" style="margin-top:7px">배속은 음 높이를 유지한 채(atempo) 소리를 빠르게 만든 뒤 받아쓰기합니다. 25MB를 넘으면 10분 조각으로 나누어 처리합니다.</p>
-
-                <div class="label-row" style="margin-top:13px">
                   <label class="field-label">대용량 처리 방식</label>
                   <span class="chip" id="routeChip">미리 자르기</span>
                 </div>
-                <p class="note" id="routeNote">25MB 초과나 배속은 통째로 디코딩하지 않고 조각만 메모리에 올립니다. 첫 파일에서 ffmpeg(약 32MB)를 한 번만 내려받습니다.</p>
+                <p class="note" id="routeNote">25MB를 넘으면 통째로 디코딩하지 않고 10분 조각으로 잘라 조각만 메모리에 올립니다. 첫 파일에서 ffmpeg(약 32MB)를 한 번만 내려받습니다.</p>
 
                 <div style="height:12px"></div>
                 <label class="field-label" for="chatModel">요약 모델</label>
@@ -686,6 +670,7 @@
                   </select>
                   <svg class="ic ic-sm chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9.5l6 6 6-6"></path></svg>
                 </div>
+                <p class="note">전사가 길면(3,500자 초과) 한 번에 보내지 않고 3,200자 안팩으로 나춴 정리한 다임 하나로 합칩니다. 카드에 "정리 중 (2/4)"처럼 진행이 표시됩니다.</p>
 
                 <div class="grid-2" style="margin-top:12px">
                   <div>
@@ -894,7 +879,6 @@
         outLang: 'audio_note_out_lang',
         mode: 'audio_note_mode',
         custom: 'audio_note_custom_prompt',
-        speed: 'audio_note_speed',
         settings: 'audio_note_settings_open',
         quota: 'audio_note_quota',
         usage: 'audio_note_usage'
@@ -916,7 +900,6 @@
       var toggleAllBtn = $('toggleAllBtn'), toggleAllLabel = $('toggleAllLabel');
       var settingsCard = $('settingsCard'), settingsToggle = $('settingsToggle'), settingsBtn = $('settingsBtn');
       var sumKeys = $('sumKeys'), sumModels = $('sumModels');
-      var speedRange = $('speedRange'), speedSeg = $('speedSeg'), speedChip = $('speedChip'), sumSpeed = $('sumSpeed');
       var routeChip = $('routeChip'), routeNote = $('routeNote');
       var progressWrap = $('progress'), progressText = $('progressText'), progressPct = $('progressPct');
       var progressFill = $('progressFill'), etaValue = $('etaValue');
@@ -927,7 +910,6 @@
       var items = [];
       var seq = 0;
       var sttChoice = 'turbo';
-      var speedValue = 1;
       var busy = false;
       var allCollapsed = false;
       var settingsOpen = false;
@@ -1245,37 +1227,8 @@
           sumKeys.classList.toggle('warn', keys.length === 0);
         }
         if (sumModels) sumModels.textContent = STT[sttChoice].name + ' · ' + prettyModel(chatModel.value);
-        renderSpeed();
       }
 
-      /* ---------- speed (1.0x ~ 2.0x) ---------- */
-      function fmtSpeed(v) {
-        var s = Math.round(v * 100) / 100;
-        return (s % 1 === 0 ? s.toFixed(1) : String(s)) + 'x';
-      }
-      function renderSpeed() {
-        if (speedRange) speedRange.value = String(speedValue);
-        if (speedChip) speedChip.textContent = fmtSpeed(speedValue);
-        if (speedSeg) {
-          Array.prototype.forEach.call(speedSeg.querySelectorAll('.seg-btn'), function (btn) {
-            var on = Math.abs(parseFloat(btn.getAttribute('data-speed')) - speedValue) < 0.001;
-            btn.classList.toggle('active', on);
-            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-          });
-        }
-        if (sumSpeed) {
-          var active = speedValue > 1.0001;
-          sumSpeed.hidden = !active;
-          if (active) sumSpeed.textContent = fmtSpeed(speedValue) + ' 배속';
-        }
-      }
-      function setSpeed(v, persist) {
-        var n = parseFloat(v);
-        if (isNaN(n)) n = 1;
-        speedValue = Math.min(2, Math.max(1, Math.round(n * 100) / 100));
-        if (persist) write(LS.speed, String(speedValue));
-        renderSpeed();
-      }
       function addKeysFromText(text) {
         var parts = String(text).split(/[\s,]+/);
         var added = 0, dup = 0;
@@ -1347,15 +1300,6 @@
       var savedChat = read(LS.chat);
       if (savedChat && chatModel.querySelector('option[value="' + savedChat + '"]')) chatModel.value = savedChat;
       chatModel.addEventListener('change', function () { write(LS.chat, chatModel.value); renderSettingsSummary(); });
-
-      var savedSpeed = parseFloat(read(LS.speed));
-      setSpeed(isNaN(savedSpeed) ? 1 : savedSpeed, false);
-      speedRange.addEventListener('input', function () { setSpeed(speedRange.value, true); });
-      speedSeg.addEventListener('click', function (e) {
-        var btn = e.target.closest ? e.target.closest('.seg-btn') : null;
-        if (!btn) return;
-        setSpeed(btn.getAttribute('data-speed'), true);
-      });
 
       var savedLang = read(LS.lang);
       if (savedLang !== null && langSelect.querySelector('option[value="' + savedLang + '"]')) langSelect.value = savedLang;
@@ -1491,7 +1435,6 @@
           big: file.size > MAX_BYTES,
           splitTotal: 0,
           splitIndex: 0,
-          speed: 0,
           status: 'pending',
           error: '',
           transcript: '',
@@ -1525,12 +1468,14 @@
         if (it.status === 'transcribing') {
           if (it.loadingFF) return '분할 준비 중 (1회 로딩)';
           if (it.splitTotal > 1) {
-            return '분할 전사 (' + Math.min(it.splitIndex, it.splitTotal) + '/' + it.splitTotal + ' 완료)';
+            return '분할 전사 (' + Math.min(it.partsDone || 0, it.splitTotal) + '/' + it.splitTotal + ' 완료)';
           }
-          if (it.speed > 1.0001) return it.splitIndex ? '배속 전사 중' : '배속 준비 중';
           return it.big ? '분할 준비 중' : '전사 중';
         }
-        if (it.status === 'summarizing') return '정리 중';
+        if (it.status === 'summarizing') {
+          if (it.chatPart && it.chatPartTotal > 1) return '정리 중 (' + it.chatPart + '/' + it.chatPartTotal + ')';
+          return '정리 중';
+        }
         if (it.status === 'done') return '완료';
         if (it.status === 'skipped') return '건너뜀';
         return '오류';
@@ -1691,7 +1636,12 @@
       }
       function friendlyError(res, what) {
         if (res.status === 401) return Promise.resolve(what + ' 실패: API 키가 올바르지 않습니다. Groq 콘솔에서 키를 다시 확인해 주세요.');
-        if (res.status === 413) return Promise.resolve(what + ' 실패: 파일이 너무 큽니다. 잠시 후 다시 시도하거나 파일을 나누어 주세요.');
+        if (res.status === 413) {
+          if (what && what.indexOf('정리') !== -1) {
+            return Promise.resolve(what + ' 실패: 텍스트가 너무 길어 한 번에 정리하지 못했습니다. 자동으로 나누어 다시 시도해 주세요.');
+          }
+          return Promise.resolve(what + ' 실패: 파일이 너무 큽니다. 잠시 후 다시 시도하거나 파일을 나누어 주세요.');
+        }
         return errorDetail(res).then(function (detail) {
           return what + ' 실패 (' + res.status + ')' + (detail ? ' — ' + detail : '');
         });
@@ -1778,44 +1728,6 @@
             });
           };
           reader.readAsArrayBuffer(file);
-        });
-      }
-      /* 배속: 16kHz 모노 OfflineAudioContext에서 playbackRate로 소리를 먼저 빠르게 만든다. */
-      function renderAtSpeed(audio, speed) {
-        return new Promise(function (resolve, reject) {
-          var Off = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-          if (!Off) {
-            reject(new Error('이 브라우저에서는 배속을 지원하지 않습니다. 배속을 1.0x로 바꾸거나 파일을 나누어 올려 주세요.'));
-            return;
-          }
-          var inRate = audio.sampleRate || SPLIT_RATE;
-          var dur = audio.length / inRate;
-          var len = Math.max(1, Math.ceil((dur / speed) * SPLIT_RATE));
-          var ctx;
-          try {
-            ctx = new Off(1, len, SPLIT_RATE);
-          } catch (e) {
-            reject(new Error('배속 처리를 시작하지 못했습니다. 배속을 1.0x로 바꾸거나 파일을 나누어 올려 주세요.'));
-            return;
-          }
-          try {
-            var src = ctx.createBufferSource();
-            src.buffer = audio;
-            src.playbackRate.value = speed;
-            src.connect(ctx.destination);
-            src.start(0);
-          } catch (e2) {
-            reject(new Error('배속 처리를 시작하지 못했습니다. 배속을 1.0x로 바꾸거나 파일을 나누어 올려 주세요.'));
-            return;
-          }
-          var p = ctx.startRendering();
-          if (!p || typeof p.then !== 'function') {
-            reject(new Error('배속 처리를 마치지 못했습니다. 배속을 1.0x로 바꾸거나 파일을 나누어 올려 주세요.'));
-            return;
-          }
-          p.then(function (buf) { resolve(buf); }, function () {
-            reject(new Error('배속 처리를 마치지 못했습니다. 배속을 1.0x로 바꾸거나 파일을 나누어 올려 주세요.'));
-          });
         });
       }
       function wavHeader(dataBytes) {
@@ -1965,6 +1877,18 @@
         ffChain = p.then(function () {}, function () {});
         return p;
       }
+      /* ffBusy: 지금 다른 파일이 ffmpeg를 쓰고 있는지. 조각 뽑기와 업로드를 겹치게 돌릴 때 쓴다. */
+      var ffBusy = false;
+      function ffSerialTask(fn) {
+        ffBusy = true;
+        return ffSerial(fn).then(function (r) {
+          ffBusy = false;
+          return r;
+        }, function (e) {
+          ffBusy = false;
+          throw e;
+        });
+      }
       function mountInput(inst, file) {
         function doMount() {
           return inst.mount(NS_WORKERFS(), { files: [file] }, '/input').then(function (ok) {
@@ -2009,11 +1933,10 @@
         if (ext === 'aac') return 'audio/aac';
         return 'audio/mp4';
       }
-      /* 경로 판정: 원본 그대로 / ffmpeg 로 자르기·배속 / 브라우저 디코딩 */
-      function chooseRoute(it, speed) {
-        if (speed <= 1.0001 && it.size <= MAX_BYTES) return 'direct';
+      /* 경로 판정: 원본 그대로 / ffmpeg 로 자르기 / 브라우저 디코딩 */
+      function chooseRoute(it) {
+        if (it.size <= MAX_BYTES) return 'direct';
         if (!ffmpegSupported() || ffState.failed) return 'decode';
-        if (speed > 1.0001) return 'atempo';
         if (copyMux(it.name)) return 'copy';
         return 'reencode';
       }
@@ -2028,9 +1951,9 @@
         } else if (ffState.failed) {
           routeNote.textContent = 'ffmpeg를 내려받지 못해 브라우저 디코딩으로 처리합니다. 네트워크를 확인한 뒤 새로고침하면 다시 시도합니다.';
         } else if (ffState.loadMs) {
-          routeNote.textContent = 'ffmpeg 준비됨(' + (Math.round(ffState.loadMs / 100) / 10) + '초 로딩). 25MB 초과·배속 파일은 조각만 메모리에 올립니다.';
+          routeNote.textContent = 'ffmpeg 준비됨(' + (Math.round(ffState.loadMs / 100) / 10) + '초 로딩). 25MB를 넘는 파일은 조각만 메모리에 올립니다.';
         } else {
-          routeNote.textContent = '25MB 초과나 배속은 통째로 디코딩하지 않고 조각만 메모리에 올립니다. 첫 파일에서 ffmpeg(약 32MB)를 한 번만 내려받습니다.';
+          routeNote.textContent = '25MB를 넘으면 통째로 디코딩하지 않고 10분 조각으로 잘라 조각만 메모리에 올립니다. 첫 파일에서 ffmpeg(약 32MB)를 한 번만 내려받습니다.';
         }
       }
 
@@ -2199,109 +2122,213 @@
         return attemptModel(0);
       }
 
-      /* 25MB 초과 또는 배속: 디코딩 → (배속) → 16kHz 모노 WAV 한 개 또는 10분 청크들 → 순서대로 받아쓰기
+      /* ---------- 조각 큐: 파일 하나의 분할 조각을 등록된 모든 키가 나눠 전사 ---------- */
+      /* 조각을 뽑는 일(ffmpeg·디코딩)은 한 번에 하나씩만 하고, 뽑힌 조각은 PART 큐에 넣어
+         등록된 모든 키가 동시에 가져가 업로드·전사한다. 키 1개면 순차, 2개면 2조각, 4개면 4조각 동시. */
+      var PART = { tasks: [] };
+      function pushPart(task) { PART.tasks.push(task); wakeWorkers(); }
+      function takePartFor(w) {
+        if (coolLeftFor(w.key) > 0) return null;
+        return PART.tasks.shift() || null;
+      }
+      /* 조각 하나를 이 키로 전사한다. 429면 그 조각만 큐에 남겨 다른 키(또는 쉬고 난 키)가 이어받는다. */
+      function runPartTask(w, task) {
+        var ki = keyInfoOf(w.key);
+        return sttAttemptKey(ki, task.it, task.lang, {
+          file: task.file,
+          seconds: task.seconds,
+          label: task.label,
+          allowEmpty: true
+        }).then(function (text) {
+          task.resolve(text);
+          return true;
+        }, function (err) {
+          if (err && err.rateLimited) {
+            var sec = err.waitSec > 0 ? Math.min(Math.max(err.waitSec, 1), 300) : DEFAULT_COOL_SEC;
+            setCool(w.key, sec);
+            PART.tasks.unshift(task);
+            if (keys.length > 1) {
+              addNotice((w.key + 1) + '번 키가 한도(429)에 걸려 ' + sec + '초 쉬는 동안 이 조각은 다른 키가 이어받습니다.');
+            }
+            return true;
+          }
+          task.reject(err);
+          return true;
+        });
+      }
+      function partLabel(index, total) {
+        return total > 1 ? '분할 받아쓰기 (' + (index + 1) + '/' + total + ')' : '받아쓰기';
+      }
+      /* 한 파일을 조각으로 뽑아 큐에 넣으며, 뽑기(CPU)와 업로드(네트워크)가 겹치게 돌린다.
+         opts: { total, window, first, busy(), extract(index) -> Promise<{file, seconds}|null> } */
+      function driveSplit(w, it, lang, opts) {
+        var texts = it.partTexts || (it.partTexts = []);
+        var silent = it.partSilent || 0;
+        var total = opts.total || 0;
+        var win = Math.max(1, Math.min(keys.length || 1, opts.window || 4));
+        var next = 0, inflight = 0, eof = false, fatal = null, ended = false;
+        var settled = {};
+        var done = new Promise(function (resolve, reject) {
+          settled.resolve = resolve;
+          settled.reject = reject;
+        });
+
+        function queuePart(index, part) {
+          inflight += 1;
+          var p = new Promise(function (resolve, reject) {
+            pushPart({
+              it: it, lang: lang, file: part.file, seconds: part.seconds,
+              index: index, label: partLabel(index, total), resolve: resolve, reject: reject
+            });
+          });
+          p.then(function (text) {
+            inflight -= 1;
+            texts[index] = text || '';
+            if (!text) silent += 1;
+            it.partSilent = silent;
+            it.partsDone = (it.partsDone || 0) + 1;
+            it.splitIndex = Math.max(it.splitIndex || 0, index + 1);
+            updateCard(it);
+            updateProgressBar();
+            wakeWorkers();
+          }, function (err) {
+            inflight -= 1;
+            if (!fatal) fatal = err;
+            wakeWorkers();
+          });
+        }
+        function extractNext() {
+          var index = next;
+          return opts.extract(index).then(function (part) {
+            if (!part) { eof = true; return; }
+            next = index + 1;
+            if (!total) { total = next; it.splitTotal = total; }
+            it.splitIndex = Math.max(it.splitIndex || 0, next);
+            queuePart(index, part);
+            updateCard(it);
+            updateProgressBar();
+          }, function (err) {
+            eof = true;
+            if (!fatal) fatal = err;
+          });
+        }
+        function allExtracted() {
+          return eof || next >= FF_MAX_PARTS || (total > 0 && next >= total);
+        }
+        function pump() {
+          if (ended) return done;
+          if (fatal) {
+            ended = true;
+            settled.reject(fatal);
+            return done;
+          }
+          var canExtract = !allExtracted() && inflight < win &&
+            !(opts.busy && opts.busy());
+          if (canExtract) {
+            return extractNext().then(pump);
+          }
+          var t = takePartFor(w);
+          if (t) {
+            return runPartTask(w, t).then(function () {
+              wakeWorkers();
+              return pump();
+            });
+          }
+          if (allExtracted() && inflight === 0) {
+            ended = true;
+            settled.resolve(true);
+            return done;
+          }
+          return waitWork().then(pump);
+        }
+        if (opts.first) {
+          next = 1;
+          it.splitIndex = Math.max(it.splitIndex || 0, 1);
+          queuePart(0, opts.first);
+        }
+        pump();
+        return done.then(function () {
+          var joined = texts.filter(function (t) { return !!t; }).join('\n\n');
+          if (!joined) {
+            throw new Error('음성을 인식하지 못했습니다. 이 파일에서 말소리를 찾지 못했으니 다른 녹음을 확인해 주세요.');
+          }
+          return { text: joined, total: Math.max(total, next), silent: silent };
+        });
+      }
+
+      /* 25MB 초과(또는 ffmpeg 미지원): 브라우저 디코딩 → 16kHz 모노 WAV 10분 조각 → 조각 큐로 병렬 전사
          (ffmpeg를 못 쓰는 브라우저·실패 시의 마지막 경로) */
-      /* 25MB 초과 또는 배속: 디코딩 → (배속) → 16kHz 모노 WAV 한 개 또는 10분 청크들 → 순서대로 받아쓰기
-         (ffmpeg를 못 쓰는 브라우저·실패 시의 마지막 경로. 429로 끊기면 처음부터 다시 한다) */
-      function transcribeSplit(it, lang, speed, ki) {
+      function transcribeSplit(it, lang, w) {
         var cleanup = function () {};
-        var texts = [];
-        var silent = 0;
+        var audio = null;
         it.status = 'transcribing';
         it.splitIndex = 0;
         it.splitTotal = 0;
         it.partsDone = 0;
         it.partTexts = [];
-        setStatus((speed > 1.0001 ? '배속·' : '') + '나누는 준비 중 · ' + it.name, true, false);
+        it.partSilent = 0;
+        setStatus('나누는 준비 중 · ' + it.name, true, false);
         updateCard(it);
 
-        var work = decodeAudioFile(it.file).then(function (dec) {
+        return decodeAudioFile(it.file).then(function (dec) {
           cleanup = dec.close;
-          var decoded = dec.audio;
-          var ready;
-          if (speed > 1.0001) {
-            setStatus('배속 적용 중 · ' + it.name + ' · ' + fmtSpeed(speed), true, false);
-            ready = renderAtSpeed(decoded, speed);
-          } else {
-            ready = Promise.resolve(decoded);
-          }
-          return ready.then(function (audio) {
-            var inRate = audio.sampleRate || SPLIT_RATE;
-            var outLen = Math.round((audio.length / inRate) * SPLIT_RATE);
-            if (!outLen) throw new Error('오디오 길이를 읽지 못해 자동 분할을 못 했습니다. 파일을 나누어 올려 주세요.');
-            var perMax = Math.floor((SPLIT_MAX_BYTES - 44) / 2);
-            var per = Math.min(SPLIT_SECONDS * SPLIT_RATE, perMax);
-            var parts = Math.max(1, Math.ceil(outLen / per));
-            it.splitTotal = parts;
-            updateCard(it);
-            function step(i) {
-              if (i >= parts) return Promise.resolve(texts);
-              var start = i * per;
+          audio = dec.audio;
+          var inRate = audio.sampleRate || SPLIT_RATE;
+          var outLen = Math.round((audio.length / inRate) * SPLIT_RATE);
+          if (!outLen) throw new Error('오디오 길이를 읽지 못해 자동 분할을 못 했습니다. 파일을 나누어 올려 주세요.');
+          var perMax = Math.floor((SPLIT_MAX_BYTES - 44) / 2);
+          var per = Math.min(SPLIT_SECONDS * SPLIT_RATE, perMax);
+          var total = Math.max(1, Math.ceil(outLen / per));
+          it.splitTotal = total;
+          updateCard(it);
+          return driveSplit(w, it, lang, {
+            total: total,
+            window: 2,
+            extract: function (index) {
+              var start = index * per;
               var stop = Math.min(outLen, start + per);
-              var tag = parts > 1 ? '분할 받아쓰기 (' + (i + 1) + '/' + parts + ')' : '받아쓰기';
+              if (start >= outLen) return Promise.resolve(null);
               return encodeWavChunk(audio, start, stop).then(function (blob) {
-                var name = (parts > 1 ? it.base + '-part' + (i + 1) + 'of' + parts : it.base) + '.wav';
-                var chunk = new File([blob], name, { type: 'audio/wav', lastModified: Date.now() });
-                return sttChunk(ki, it, lang, {
-                  file: chunk,
-                  seconds: (stop - start) / SPLIT_RATE,
-                  label: tag,
-                  allowEmpty: true
-                }).then(function (text) {
-                  if (text) texts.push(text); else silent += 1;
-                  it.splitIndex = i + 1;
-                  it.partsDone = i + 1;
-                  updateCard(it);
-                  updateProgressBar();
-                  return step(i + 1);
-                });
+                var name = (total > 1 ? it.base + '-part' + (index + 1) + 'of' + total : it.base) + '.wav';
+                return {
+                  file: new File([blob], name, { type: 'audio/wav', lastModified: Date.now() }),
+                  seconds: (stop - start) / SPLIT_RATE
+                };
               });
             }
-            return step(0);
           });
-        });
-
-        return work.then(function (list) {
+        }).then(function (res) {
           cleanup();
-          if (!list.length) {
-            throw new Error('음성을 인식하지 못했습니다. 이 파일에서 말소리를 찾지 못했으니 다른 녹음을 확인해 주세요.');
-          }
-          if (it.splitTotal > 1) {
-            addNotice(it.name + ': ' + it.splitTotal + '개 구간으로 나누어 받아쓰기한 뒤 하나로 합쳤습니다.');
-          }
-          if (silent) {
-            addNotice(it.name + ': 구간 ' + silent + '개에서는 음성을 인식하지 못했습니다.');
-          }
-          it.splitIndex = it.splitTotal;
-          return list.join('\n\n');
+          if (res.total > 1) addNotice(it.name + ': ' + res.total + '개 구간으로 나누어 받아쓰기한 뒤 하나로 합쳤습니다.');
+          if (res.silent) addNotice(it.name + ': 구간 ' + res.silent + '개에서는 음성을 인식하지 못했습니다.');
+          it.splitIndex = res.total;
+          updateCard(it);
+          return res.text;
         }, function (err) {
           cleanup();
           if (err && err.rateLimited) throw err;
-          if (texts.length) {
-            it.transcript = texts.join('\n\n');
+          var partial = (it.partTexts || []).filter(function (t) { return !!t; }).join('\n\n');
+          if (partial) {
+            it.transcript = partial;
             it.tab = 'transcript';
-            err.message = err.message + ' (' + texts.length + '/' + (it.splitTotal || '?') + '개 구간까지 받아쓰기한 텍스트만 남겼습니다.)';
+            err.message = err.message + ' (' + (it.partsDone || 0) + '/' + (it.splitTotal || '?') + '개 구간까지 받아쓰기한 텍스트만 남겼습니다.)';
           }
           throw err;
         });
       }
 
       /* ---------- ffmpeg로 잘라 가며 받아쓰기 ---------- */
-      /* 원본 File은 WORKERFS로 마운트해 읽고, 출력 조각은 하나씩 MEMFS에 만든 뒤 바로 보내고 지운다.
-         한도를 만나 끊기면 이미 받아쓴 조각(it.partTexts)은 두고 다음 조각부터 이어 간다. */
-      function transcribeFfmpeg(it, lang, speed, ki) {
-        var texts = it.partTexts || (it.partTexts = []);
-        var silent = it.partSilent || 0;
-        var parts = it.partsDone || 0;
-        var produced = parts;
-        var eof = false;
+      /* 원본 File은 WORKERFS로 마운트해 읽고, 출력 조각은 하나씩 MEMFS에 만든 뒤 바로 읽어 지운다.
+         조각 추출(ffSerial)만 전역 직렬이고, 추출된 조각의 업로드·전사는 조각 큐로 나가 모든 키가 병렬 처리한다. */
+      function transcribeFfmpeg(it, lang, w) {
         var inst = null;
+        var plan = null;
         var inPath = '/input/' + (it.file.name || ('in-' + it.id));
+        var texts = it.partTexts || (it.partTexts = []);
 
         it.status = 'transcribing';
-        it.splitIndex = parts;
-        if (!it.splitTotal) it.splitTotal = 0;
         it.loadingFF = !(ffState.inst && ffState.inst.loaded);
+        it.splitIndex = it.partsDone || 0;
         setStatus((it.loadingFF ? '분할 준비 중 (ffmpeg 1회 로딩) · ' : '분할 준비 중 · ') + it.name, true, false);
         updateCard(it);
 
@@ -2314,121 +2341,96 @@
               sec = Math.floor((SPLIT_MAX_BYTES * 0.78) / bps);
               if (sec > SPLIT_SECONDS) sec = SPLIT_SECONDS;
             }
-            return { route: route, sec: sec, ext: extOf(it.name) || 'm4a', mux: copyMux(it.name), shift: 1, dur: dur };
+            return { route: route, sec: sec, ext: extOf(it.name) || 'm4a', mux: copyMux(it.name), dur: dur };
           }
-          return { route: route, sec: SPLIT_SECONDS, ext: 'wav', mux: 'wav', shift: route === 'atempo' ? speed : 1, dur: dur };
+          return { route: route, sec: SPLIT_SECONDS, ext: 'wav', mux: 'wav', dur: dur };
         }
-        function argsFor(plan, index, outPath) {
-          if (plan.route === 'copy') {
-            return ['-hide_banner', '-nostdin', '-ss', String(index * plan.sec), '-i', inPath,
-              '-t', String(plan.sec), '-vn', '-c:a', 'copy', '-f', plan.mux, outPath];
+        function totalFor(p) {
+          return p.dur > 0 ? Math.max(1, Math.ceil(p.dur / p.sec)) : 0;
+        }
+        function argsFor(p, index, outPath) {
+          if (p.route === 'copy') {
+            return ['-hide_banner', '-nostdin', '-ss', String(index * p.sec), '-i', inPath,
+              '-t', String(p.sec), '-vn', '-c:a', 'copy', '-f', p.mux, outPath];
           }
-          var a = ['-hide_banner', '-nostdin', '-ss', String(index * plan.sec * plan.shift), '-i', inPath,
-            '-t', String(plan.sec), '-vn'];
-          if (plan.route === 'atempo') a.push('-filter:a', 'atempo=' + speed);
-          a.push('-ac', '1', '-ar', String(SPLIT_RATE), '-c:a', 'pcm_s16le', '-f', 'wav', outPath);
-          return a;
+          return ['-hide_banner', '-nostdin', '-ss', String(index * p.sec), '-i', inPath,
+            '-t', String(p.sec), '-vn',
+            '-ac', '1', '-ar', String(SPLIT_RATE), '-c:a', 'pcm_s16le', '-f', 'wav', outPath];
         }
-
-        function runRoute(plan) {
-          var total = plan.dur > 0 ? Math.max(1, Math.ceil((plan.dur / plan.shift) / plan.sec)) : 0;
-          it.splitTotal = total || it.splitTotal || 0;
-          updateCard(it);
-
-          function step() {
-            if (eof || produced >= FF_MAX_PARTS) return Promise.resolve();
-            if (total && produced >= total) return Promise.resolve();
-            var index = produced;
-            var outPath = '/out-' + it.id + '-' + index + '.' + plan.ext;
-            return ffSerial(function () {
-              var buf = null;
-              return mountInput(inst, it.file).then(function () {
-                return inst.exec(argsFor(plan, index, outPath));
-              }).then(function (ret) {
-                if (ret !== 0) {
-                  var e = new Error('ffmpeg 실행 실패');
-                  e.ffmpeg = true;
-                  throw e;
-                }
-                if (plan.route === 'copy' && index === 0) return probeMini(inst, outPath);
-                return true;
-              }).then(function (ok) {
-                if (ok === false) {
-                  var e2 = new Error('-c copy 결과가 깨졌습니다.');
-                  e2.ffmpeg = true;
-                  throw e2;
-                }
-                return inst.readFile(outPath, 'binary');
-              }).then(function (data) {
-                buf = data;
-                return inst.deleteFile(outPath).catch(function () {});
-              }, function (err) {
-                return inst.deleteFile(outPath).catch(function () {}).then(function () { throw err; });
-              }).then(function () {
-                return unmountInput(inst);
-              }).then(function () {
-                return buf;
-              });
-            }).then(function (data) {
-              var size = data && data.length ? data.length : 0;
-              if (!size) { eof = true; return; }
-              if (size > SPLIT_MAX_BYTES) {
-                var e = new Error('조각이 24MB를 넘습니다.');
+        function extractRaw(index) {
+          var p = plan;
+          var outPath = '/out-' + it.id + '-' + index + '.' + p.ext;
+          return ffSerialTask(function () {
+            var buf = null;
+            return mountInput(inst, it.file).then(function () {
+              return inst.exec(argsFor(p, index, outPath));
+            }).then(function (ret) {
+              if (ret !== 0) {
+                var e = new Error('ffmpeg 실행 실패');
                 e.ffmpeg = true;
                 throw e;
               }
-              var mime = mimeOf(plan.ext);
-              var part = produced + 1;
-              var fname = (total !== 1 ? it.base + '-part' + part + (total ? 'of' + total : '') : it.base) + '.' + plan.ext;
-              var chunk = new File([new Blob([data], { type: mime })], fname, { type: mime, lastModified: Date.now() });
-              data = null;
-              produced = part;
-              it.splitIndex = part;
-              updateCard(it);
-              updateProgressBar();
-              return sttChunk(ki, it, lang, {
-                file: chunk,
-                seconds: plan.sec,
-                label: total > 1 ? '분할 받아쓰기 (' + part + '/' + total + ')' : '받아쓰기',
-                allowEmpty: true
-              }).then(function (text) {
-                if (text) texts[part - 1] = text; else silent += 1;
-                it.partSilent = silent;
-                it.partsDone = part;
-                it.splitMethod = plan.route;
-                updateCard(it);
-                return step();
-              });
+              if (p.route === 'copy' && index === 0) return probeMini(inst, outPath);
+              return true;
+            }).then(function (ok) {
+              if (ok === false) {
+                var e2 = new Error('-c copy 결과가 깨졌습니다.');
+                e2.ffmpeg = true;
+                throw e2;
+              }
+              return inst.readFile(outPath, 'binary');
+            }).then(function (data) {
+              buf = data;
+              return inst.deleteFile(outPath).catch(function () {});
+            }, function (err) {
+              return inst.deleteFile(outPath).catch(function () {}).then(function () { throw err; });
+            }).then(function () {
+              return unmountInput(inst);
+            }).then(function () {
+              return buf;
             });
-          }
-          return step();
+          }).then(function (data) {
+            var size = data && data.length ? data.length : 0;
+            if (!size) return null;
+            if (size > SPLIT_MAX_BYTES) {
+              var e = new Error('조각이 24MB를 넘습니다.');
+              e.ffmpeg = true;
+              throw e;
+            }
+            var mime = mimeOf(p.ext);
+            var total = totalFor(p);
+            var part = index + 1;
+            var fname = (total !== 1 ? it.base + '-part' + part + (total ? 'of' + total : '') : it.base) + '.' + p.ext;
+            return {
+              file: new File([new Blob([data], { type: mime })], fname, { type: mime, lastModified: Date.now() }),
+              seconds: p.sec
+            };
+          });
         }
-
         function routeList() {
-          if (speed > 1.0001) return ['atempo'];
           return copyMux(it.name) ? ['copy', 'reencode'] : ['reencode'];
         }
-        function tryRoute(ri) {
+        function startRoute(ri) {
           var list = routeList();
-          if (it.splitMethod && parts > 0) {
-            var saved = list.indexOf(it.splitMethod);
-            if (saved > ri) ri = saved;
-          }
-          if (ri >= list.length) {
-            if (!produced) throw ffFallbackError();
-            return Promise.resolve();
-          }
-          var route = list[ri];
-          var plan = planFor(route);
-          if (route === 'copy' && plan.sec < 20) return tryRoute(ri + 1);
-          it.splitMethod = route;
-          var sent = produced;
-          return runRoute(plan).then(function () {}, function (err) {
-            /* 아직 아무 조각도 보내지 않았으면 다음 방식으로 넘어간다. */
-            if (produced === sent) {
-              it.splitMethod = '';
-              return tryRoute(ri + 1);
+          if (ri >= list.length) throw ffFallbackError();
+          plan = planFor(list[ri]);
+          if (plan.route === 'copy' && plan.sec < 20) return startRoute(ri + 1);
+          it.splitMethod = plan.route;
+          it.splitTotal = totalFor(plan);
+          updateCard(it);
+          return extractRaw(0).then(function (first) {
+            if (!first) {
+              if (ri + 1 < list.length) return startRoute(ri + 1);
+              throw new Error('음성을 인식하지 못했습니다. 이 파일에서 말소리를 찾지 못했으니 다른 녹음을 확인해 주세요.');
             }
+            return driveSplit(w, it, lang, {
+              total: totalFor(plan),
+              first: first,
+              busy: function () { return ffBusy; },
+              extract: function (i) { return extractRaw(i); }
+            });
+          }, function (err) {
+            if (err && err.ffmpeg && ri + 1 < list.length) return startRoute(ri + 1);
             throw err;
           });
         }
@@ -2437,34 +2439,31 @@
           inst = ff;
           it.loadingFF = false;
           updateCard(it);
-          return tryRoute(0);
-        }).then(function () {
-          var joined = texts.filter(function (t) { return !!t; }).join('\n\n');
-          if (!joined) {
-            throw new Error('음성을 인식하지 못했습니다. 이 파일에서 말소리를 찾지 못했으니 다른 녹음을 확인해 주세요.');
-          }
-          if (produced > 1) addNotice(it.name + ': ' + produced + '개 구간으로 나누어 받아쓰기한 뒤 하나로 합쳤습니다.');
-          if (silent) addNotice(it.name + ': 구간 ' + silent + '개에서는 음성을 인식하지 못했습니다.');
-          it.splitTotal = produced;
-          it.splitIndex = produced;
+          return startRoute(0);
+        }).then(function (res) {
+          it.splitTotal = res.total;
+          it.splitIndex = res.total;
+          if (res.total > 1) addNotice(it.name + ': ' + res.total + '개 구간으로 나누어 받아쓰기한 뒤 하나로 합쳤습니다.');
+          if (res.silent) addNotice(it.name + ': 구간 ' + res.silent + '개에서는 음성을 인식하지 못했습니다.');
           updateCard(it);
-          return joined;
+          return res.text;
         }, function (err) {
           if (err && err.rateLimited) throw err;
           var partial = texts.filter(function (t) { return !!t; }).join('\n\n');
           if (partial) {
             it.transcript = partial;
             it.tab = 'transcript';
-            err.message = err.message + ' (' + texts.filter(function (t) { return !!t; }).length + '/' + (produced || '?') + '개 구간까지 받아쓰기한 텍스트만 남겼습니다.)';
+            err.message = err.message + ' (' + (it.partsDone || 0) + '/' + (it.splitTotal || '?') + '개 구간까지 받아쓰기한 텍스트만 남겼습니다.)';
           }
           throw err;
         });
       }
 
       /* ---------- 정리(요약·필기) 요청 ---------- */
-      /* 모델 폴백(선택 → gpt-oss-20b → gpt-oss-120b)은 그대로. 이 키의 두 모델이 모두 429면
-         rateLimited 로 던져 작업이 큐로 돌아가고 다른 키가 가져간다. */
-      function askChat(ki, system, user, label) {
+      /* 모델 폴백(선택 → gpt-oss-20b → gpt-oss-120b). 이 키의 두 모델이 모두 429면
+         rateLimited 로 던져 작업이 큐로 돌아가고 다른 키가 가져간다.
+         statusText 를 넘기면 상태줄에 label 대신 그 문구를 쓴다(예: '정리 중 (2/4)'). */
+      function askChat(ki, system, user, label, statusText) {
         var models = chatOrder();
         var lastWait = 0;
         function attemptModel(mi) {
@@ -2476,7 +2475,7 @@
             throw e;
           }
           var model = models[mi];
-          setStatus(label + ' 중 · ' + prettyModel(model) + (keys.length > 1 ? ' · ' + ki.num + '번 키' : ''), true, false);
+          setStatus((statusText || (label + ' 중')) + ' · ' + prettyModel(model) + (keys.length > 1 ? ' · ' + ki.num + '번 키' : ''), true, false);
           return chatRequest(ki.value, model, system, user).then(function (res) {
             noteRateLimit(ki, res, prettyModel(model));
             if (res.status === 429) {
@@ -2487,7 +2486,11 @@
               return attemptModel(mi + 1);
             }
             if (!res.ok) {
-              return friendlyError(res, label).then(function (msg) { throw new Error(msg); });
+              return friendlyError(res, label).then(function (msg) {
+                var err = new Error(msg);
+                err.status = res.status;
+                throw err;
+              });
             }
             return res.json().then(function (data) {
               var choice = data && data.choices && data.choices[0];
@@ -2500,6 +2503,132 @@
           });
         }
         return attemptModel(0);
+      }
+
+      /* ---------- 긴 텍스트: 구간 나눠 정리(Map) → 하나로 합치기(Reduce) ---------- */
+      /* Groq 무료 티어(8,000 TPM)는 긴 전사 한 번에 413을 준다. 그래서 3,500자를 넘으면
+         3,200자 안팩(문장·줄바꿈 경계)으로 나눠 순서대로 정리하고, 마지막에 한 번 더 합친다.
+         구간 하나가 413이면 그 구간만 반으로 더 쪼개 재시도(최소 1,000자)하고,
+         429는 이 키를 쉬게 하고 다른 키가 이어받는다(작업 전체를 처음부터 다시 하지 않는다). */
+      var CHAT_SINGLE_CHARS = 3500;
+      var CHAT_MAP_CHARS = 3200;
+      var CHAT_MIN_CHARS = 1000;
+
+      function splitAtBounds(text, size) {
+        var s = String(text || '').replace(/\r\n/g, '\n');
+        var out = [];
+        var start = 0;
+        while (start < s.length) {
+          var end = Math.min(s.length, start + size);
+          if (end < s.length) {
+            var from = Math.max(start + Math.floor(size * 0.5), end - Math.floor(size * 0.45));
+            var tail = s.slice(from, end);
+            var cut = -1;
+            var re = /[\n.?!。！？]/g;
+            var m;
+            while ((m = re.exec(tail)) !== null) cut = m.index;
+            if (cut >= 0) end = from + cut + 1;
+          }
+          if (end <= start) end = Math.min(s.length, start + size);
+          var piece = s.slice(start, end);
+          if (piece.trim()) out.push(piece);
+          start = end;
+        }
+        if (!out.length) out.push(s);
+        return out;
+      }
+
+      function mapPrompt(i, n) {
+        if (isEnglishOut()) {
+          return 'You condense one section of a long transcript. This is section ' + i + ' of ' + n + '. Keep every decision, name, number, technical term, example and to-do that appears, in the original order, as compact Markdown bullets. Do not add headings, do not write "section ' + i + '", do not drop detail and do not invent anything. Write in clear natural English even when the section is in Korean or another language, and keep names, numbers and technical terms exact.';
+        }
+        return '너는 긴 받아쓰기를 구간별로 먼저 정리하는 도우미야. 지금은 전체 ' + n + '개 구간 중 ' + i + '번째 구간이야. 이 구간에 나온 결정·이름·숫자·전문용어·예시·할 일을 빠뜨리지 말고 원문 순서대로 짧은 마크다운 불릿으로 정리해 줘. 소제목이나 "' + i + '번째 구간" 같은 표시는 넣지 말고, 원문에 없는 내용은 지어내지 마. 받아쓰기가 영어나 다른 언어여도 자연스러운 한국어로 써. 이름·숫자·전문용어는 원문 그대로 옮겨.';
+      }
+      function reducePrompt(base) {
+        if (isEnglishOut()) {
+          return base + '\n\nThe text you get is a set of notes made from consecutive sections of one long transcript. Merge them into one finished note in exactly the requested format: keep the order, keep the detail, never mention sections or numbers in brackets, and do not invent anything.';
+        }
+        return base + '\n\n아래 글은 긴 받아쓰기를 구간별로 먼저 정리한 요약본이야. 이 요약본들을 순서대로 합쳐 하나의 완성된 정리본으로 만들어 줘. "구간 1"·"[1]" 같은 구간 표시나 머리말은 넣지 말고, 요청한 형식의 소제목만 써서 전체 흐름이 하나로 이어지게 정리해. 세부 내용은 빠뜨리지 말고 원문에 없는 내용은 지어내지 마.';
+      }
+
+      /* 413이면 그 구간을 반으로 쪼개 다시 시도하는 단일 요청. */
+      function askChatSafe(ki, system, text, label, statusText, minChars) {
+        minChars = minChars || CHAT_MIN_CHARS;
+        return askChat(ki, system, text, label, statusText).then(null, function (err) {
+          if (!err || err.status !== 413 || text.length <= minChars) throw err;
+          var halves = splitAtBounds(text, Math.ceil(text.length / 2));
+          if (halves.length < 2) throw err;
+          return halves.reduce(function (chain, piece, i) {
+            return chain.then(function (acc) {
+              return askChatSafe(ki, system, piece, label, statusText, minChars).then(function (res) {
+                acc.text = acc.text ? acc.text + '\n\n' + res.text : res.text;
+                acc.model = res.model;
+                acc.keyNum = res.keyNum;
+                return acc;
+              });
+            });
+          }, Promise.resolve({ text: '', model: '', keyNum: ki.num }));
+        });
+      }
+
+      /* 긴 텍스트를 구간별로 정리하고 마지막에 하나로 합친다. res: {text, model, keyNum} */
+      function chatLong(ki, system, text, label, it, statusText, depth, cache) {
+        depth = depth || 0;
+        var s = String(text || '');
+        if (depth === 0 && it) {
+          var sig = s.length + ':' + s.slice(0, 24);
+          if (!it.chatCache || it.chatCache.sig !== sig) it.chatCache = { sig: sig, parts: [] };
+          cache = it.chatCache;
+        }
+        if (s.length <= CHAT_SINGLE_CHARS) {
+          return askChatSafe(ki, system, s, label, statusText).then(function (res) {
+            if (depth === 0 && it) it.chatCache = null;
+            return res;
+          });
+        }
+        var parts = splitAtBounds(s, CHAT_MAP_CHARS);
+        var list = [];
+        function step(i) {
+          if (i >= parts.length) return Promise.resolve(list);
+          if (cache && cache.parts[i] != null) {
+            list.push(cache.parts[i]);
+            return step(i + 1);
+          }
+          var status = '정리 중 (' + (i + 1) + '/' + parts.length + ')';
+          if (it) {
+            it.chatPart = i + 1;
+            it.chatPartTotal = parts.length;
+            updateCard(it);
+          }
+          return chatLong(ki, mapPrompt(i + 1, parts.length), parts[i], label, it, status, depth + 1, null)
+            .then(function (res) {
+              if (cache) cache.parts[i] = res.text;
+              list.push(res.text);
+              if (it) {
+                it.chatPart = i + 1;
+                updateCard(it);
+              }
+              return step(i + 1);
+            });
+        }
+        return step(0).then(function (list) {
+          var merged = list.map(function (t, i) { return '[' + (i + 1) + ']\n' + t; }).join('\n\n');
+          if (it) {
+            it.chatPart = 0;
+            it.chatPartTotal = parts.length;
+            updateCard(it);
+          }
+          if (depth > 2) return { text: merged, model: '', keyNum: ki.num };
+          return chatLong(ki, reducePrompt(system), merged, label, it, '정리 중 (통합)', depth + 1, null);
+        }).then(function (res) {
+          if (depth === 0 && it) {
+            it.chatCache = null;
+            it.chatPart = 0;
+            it.chatPartTotal = 0;
+            updateCard(it);
+          }
+          return res;
+        });
       }
 
 
@@ -2616,9 +2745,7 @@
 
         var badge = '<span class="badge ' + statusClass(it) + '"><span class="dot"></span>' + statusTextOf(it) + '</span>';
         var metaParts = [humanSize(it.size)];
-        if (it.speed > 1.0001) metaParts.push(fmtSpeed(it.speed) + ' 배속');
         if (it.splitMethod === 'copy') metaParts.push('미리 자르기');
-        else if (it.splitMethod === 'atempo') metaParts.push('배속(atempo)');
         else if (it.splitMethod === 'reencode') metaParts.push('16kHz 재인코딩');
         if (it.routeNote) metaParts.push(it.routeNote);
         if (it.splitTotal > 1) metaParts.push('분할 ' + it.splitTotal + '개');
@@ -2878,7 +3005,7 @@
         it.notesBusy = true;
         saveCustom();
         setStatus('필기 정리 중 · ' + it.name, true, false);
-        askChat(keyInfoOf(activeKey), notesPrompt() + customDirective(), it.transcript, '필기 정리하는').then(function (res) {
+        chatLong(keyInfoOf(activeKey), notesPrompt() + customDirective(), it.transcript, '필기 정리하는', it).then(function (res) {
           it.notes = res.text;
           it.status = 'done';
           it.error = '';
@@ -2925,16 +3052,27 @@
           return Promise.resolve();
         }
         it.tab = 'summary';
-        return askChat(ki, summaryPrompt(mode) + customDirective(), text, '정리하는').then(function (res) {
+        it.status = 'summarizing';
+        it.chatPart = 0;
+        it.chatPartTotal = 0;
+        updateCard(it);
+        return chatLong(ki, summaryPrompt(mode) + customDirective(), text, '정리하는', it).then(function (res) {
           it.summary = res.text;
-          it.chatUsed = res.model;
-          it.chatKeyNum = res.keyNum;
+          it.chatUsed = res.model || it.chatUsed;
+          it.chatKeyNum = res.keyNum || it.chatKeyNum;
+          it.chatPart = 0;
+          it.chatPartTotal = 0;
           updateCard(it);
+        }, function (err) {
+          it.chatPart = 0;
+          it.chatPartTotal = 0;
+          updateCard(it);
+          throw err;
         });
       }
 
       /* 파일 하나의 전사: 원본 그대로 / ffmpeg로 잘라 가며 / 브라우저 디코딩 */
-      function transcribeItem(it, ki) {
+      function transcribeItem(it, ki, w) {
         var lang = langSelect.value;
         if (!it.route || it.partsDone === 0) {
           it.error = '';
@@ -2949,43 +3087,140 @@
           it.partTexts = [];
           it.partsDone = 0;
           it.partSilent = 0;
-          it.speed = speedValue;
           it.transcript = '';
           it.summary = '';
           it.notes = '';
           it.open = true;
-          it.route = chooseRoute(it, it.speed);
+          it.route = chooseRoute(it);
           if (it.route === 'direct' || it.route === 'decode') it.splitMethod = '';
           updateCard(it);
         }
 
         if (it.route === 'direct') {
           it.status = 'transcribing';
+          it.loadingFF = false;
           updateCard(it);
           return sttChunk(ki, it, lang, { label: '받아쓰기' });
         }
-        if (it.route === 'decode') return transcribeSplit(it, lang, it.speed, ki);
-        return transcribeFfmpeg(it, lang, it.speed, ki).catch(function (err) {
+        if (it.route === 'decode') return transcribeSplit(it, lang, w);
+        return transcribeFfmpeg(it, lang, w).catch(function (err) {
           if (!err || !err.ffFallback) throw err;
           it.route = 'decode';
           it.loadingFF = false;
           it.routeNote = '브라우저 디코딩으로 대체';
           it.splitTotal = 0;
           it.splitIndex = 0;
+          it.partsDone = 0;
+          it.partTexts = [];
+          it.partSilent = 0;
           addNotice(it.name + ': 미리 자르기(ffmpeg)를 쓰지 못해 브라우저 디코딩으로 처리합니다.');
           renderRouteState();
-          return transcribeSplit(it, lang, it.speed, ki);
+          return transcribeSplit(it, lang, w);
         });
       }
 
-      /* ---------- 실행: 1단계 전사 → 2단계 정리 (키별 균등 분배 + 작업 가져오기) ---------- */
+      /* ---------- 실행: 1단계 전사 → 2단계 정리 ---------- */
+      /* 전사 단계: 워커는 ① 조각 큐에서 조각 하나를 먼저 가져가고 ② 없으면 새 파일을 잡는다.
+         파일 하나가 여러 조각이어도 등록된 모든 키가 그 조각들을 동시에 올린다. */
+      function sttItemTask(w, it) {
+        var ki = keyInfoOf(w.key);
+        return transcribeItem(it, ki, w).then(function (text) {
+          it.transcript = text || '';
+          it.status = it.runMode === 'raw' ? 'done' : 'queued';
+          WORK.sttDone += 1;
+          WORK.phaseBytes += it.size || 0;
+          if (it.runMode === 'raw') it.tab = 'transcript';
+          w.done += 1;
+          updateCard(it);
+          updateProgressBar();
+          renderWorkerStates();
+          return true;
+        }, function (err) {
+          if (err && err.rateLimited) {
+            var sec = err.waitSec > 0 ? Math.min(Math.max(err.waitSec, 1), 300) : DEFAULT_COOL_SEC;
+            setCool(w.key, sec);
+            unclaim(it);
+            it.status = 'pending';
+            if (keys.length > 1) {
+              addNotice((w.key + 1) + '번 키가 한도(429)에 걸려 ' + sec + '초 쉬는 동안 남은 작업을 다른 키가 가져옵니다.');
+            }
+            updateCard(it);
+            renderWorkerStates();
+            return true;
+          }
+          w.done += 1;
+          it.status = 'error';
+          it.error = err && err.message ? err.message : String(err);
+          WORK.sttDone += 1;
+          WORK.phaseBytes += it.size || 0;
+          if (it.transcript) it.tab = 'transcript';
+          updateCard(it);
+          updateProgressBar();
+          renderWorkerStates();
+          return true;
+        });
+      }
+
+      function runSttWorker(w) {
+        function step() {
+          if (!busy || WORK.phase !== 'stt') return Promise.resolve();
+          var left = coolLeftFor(w.key);
+          if (left > 0) {
+            w.state = 'cool';
+            renderWorkerStates();
+            announceWorkerState();
+            return sleep(Math.min(left, 800)).then(step);
+          }
+          var t = takePartFor(w);
+          if (t) {
+            w.state = 'busy';
+            w.cur = t.it;
+            w.part = true;
+            renderWorkerStates();
+            announceWorkerState();
+            return runPartTask(w, t).then(function () {
+              w.part = false;
+              w.cur = null;
+              w.state = 'idle';
+              renderWorkerStates();
+              wakeWorkers();
+              return step();
+            });
+          }
+          var it = claim(w);
+          if (!it) {
+            w.state = 'idle';
+            renderWorkerStates();
+            /* 다른 키가 아직 일하는 중이면, 그 파일이 새 조각을 올려둘 수 있으니 기다린다. */
+            if (WORK.active > 0) return waitWork().then(step);
+            return Promise.resolve();
+          }
+          WORK.active += 1;
+          it.startedAt = nowMs();
+          w.state = 'busy';
+          w.cur = it;
+          w.part = false;
+          renderWorkerStates();
+          announceWorkerState();
+          return sttItemTask(w, it).then(function () {
+            WORK.active -= 1;
+            w.cur = null;
+            w.state = 'idle';
+            renderWorkerStates();
+            wakeWorkers();
+            return step();
+          });
+        }
+        return step();
+      }
+
       function workerTask(worker, phase, it) {
         var ki = keyInfoOf(worker.key);
         worker.cur = it;
         worker.state = 'busy';
         renderWorkerStates();
         announceWorkerState();
-        var p = phase === 'stt' ? transcribeItem(it, ki) : finishItem(it, it.runMode, it.transcript, ki);
+        var p = finishItem(it, it.runMode, it.transcript, ki);
         return p.then(function (val) {
           worker.cur = null;
           worker.done += 1;
@@ -3091,7 +3326,9 @@
         setupPhase(phase, list);
         updateProgressBar();
         announceWorkerState();
-        var runs = WORK.workers.map(function (w) { return runWorker(w, phase); });
+        var runs = WORK.workers.map(function (w) {
+          return phase === 'stt' ? runSttWorker(w) : runWorker(w, phase);
+        });
         return Promise.all(runs).then(function () {
           if (!busy) return;
           if (phase === 'stt') return startPhase('chat');
@@ -3150,6 +3387,9 @@
           it.transcript = '';
           it.summary = '';
           it.notes = '';
+          it.chatCache = null;
+          it.chatPart = 0;
+          it.chatPartTotal = 0;
         });
         items.forEach(function (it) { if (queue.indexOf(it) !== -1) it.open = true; });
         renderResults();
