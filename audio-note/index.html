@@ -2262,7 +2262,7 @@
             throw new Error('음성을 인식하지 못했습니다. 이 파일에서 말소리를 찾지 못했으니 다른 녹음을 확인해 주세요.');
           }
           if (it.splitTotal > 1) {
-            addNotice(it.name + ': 25MB를 넘어 ' + it.splitTotal + '개 구간으로 나누어 받아쓰기한 뒤 하나로 합쳤습니다.');
+            addNotice(it.name + ': ' + it.splitTotal + '개 구간으로 나누어 받아쓰기한 뒤 하나로 합쳤습니다.');
           }
           if (silent) {
             addNotice(it.name + ': 구간 ' + silent + '개에서는 음성을 인식하지 못했습니다.');
@@ -2969,6 +2969,7 @@
         return transcribeFfmpeg(it, lang, it.speed, ki).catch(function (err) {
           if (!err || !err.ffFallback) throw err;
           it.route = 'decode';
+          it.loadingFF = false;
           it.routeNote = '브라우저 디코딩으로 대체';
           it.splitTotal = 0;
           it.splitIndex = 0;
