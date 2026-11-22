@@ -2564,6 +2564,7 @@
       function askChat(ki, system, user, label, statusText, it) {
         var models = chatOrder();
         var lastWait = 0;
+        var holds = 0;   /* 이 요청 안에서 같은 모델로 기다린 횟수(구간마다 새로 센다) */
 
         function attemptModel(mi) {
           if (mi >= models.length) throw rateErr(ki, lastWait);
@@ -2576,11 +2577,15 @@
               lastWait = retryAfter(res);
               return limitIsDaily(res).then(function (daily) {
                 var sec = lastWait > 0 ? Math.min(Math.max(lastWait, 1), 65) : CHAT_HOLD_SEC;
-                var holds = it ? (it.chatRetry || 0) : 0;
                 /* 선택 모델의 분당 한도: 품질을 유지한 채 먼저 회복을 기다린다. */
                 if (primary && !daily && lastWait <= 65 && holds < CHAT_HOLD_MAX) {
-                  if (it) it.chatRetry = holds + 1;
-                  if (otherKeyIdle(ki)) throw rateErr(ki, Math.max(sec, 12));
+                  holds += 1;
+                  /* 다른 키가 놀고 있으면 같은 모델 그대로 그 키가 이어받는다(작업은 큐로 돌아간다).
+                     키 사이를 계속 오가지만 않게 파일당 두 번까지만 넘긴다. */
+                  if (otherKeyIdle(ki) && (!it || (it.chatRetry || 0) < CHAT_HOLD_MAX)) {
+                    if (it) it.chatRetry = (it.chatRetry || 0) + 1;
+                    throw rateErr(ki, Math.max(sec, 12));
+                  }
                   setCool(ki.listIndex, sec);
                   addNotice(prettyModel(model) + ' 분당 한도(429)라 잠시 기다린 뒤 같은 모델로 다시 시도합니다.');
                   return holdFor(sec, label, statusText).then(function () { return attemptModel(mi); });
