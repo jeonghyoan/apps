@@ -1,4 +1,11 @@
 <!DOCTYPE html>
+<!--
+  오디오 녹음 정리기 (audio-note)
+  - Groq API 키는 이 브라우저의 localStorage에만 저장되고 api.groq.com으로만 나갑니다.
+  - 대용량용 ffmpeg 번들은 ./ffmpeg/ 아래에 두고 http(s)로 서빙할 때만 씁니다(GitHub Pages 기준).
+    이 파일을 index.html로 직접 열면(file://) 워커/서비스워커 로딩이 막히므로
+    앱이 자동으로 기존 브라우저 디코딩 경로로 폴백합니다.
+-->
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
@@ -302,6 +309,15 @@
       font-size: 10.5px; color: var(--muted); line-height: 1.4;
       overflow: hidden; text-overflow: ellipsis; white-space: normal;
     }
+    .key-role { flex: none; }
+    .role-select {
+      appearance: none; -webkit-appearance: none; cursor: pointer;
+      min-height: 28px; padding: 3px 22px 3px 7px; border-radius: 8px;
+      border: 1px solid var(--line-strong); background: var(--surface); color: var(--text);
+      font-family: inherit; font-size: 11px; font-weight: 620;
+    }
+    .key-role .chev { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; width: 12px; height: 12px; }
+    .pipe-chips { display: inline-flex; gap: 5px; flex-wrap: wrap; }
 
     /* ---------- drop zone ---------- */
     .work-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
@@ -624,6 +640,7 @@
                 </div>
                 <ul class="key-list" id="keyList"></ul>
                 <p class="note">모든 키는 이 기기 브라우저의 localStorage에만 저장되고, 화면에는 끝 4자리만 보이도록 마스킹됩니다. 요청은 <code>api.groq.com</code>으로만 나갑니다.</p>
+                <p class="note">키마다 역할을 나누면 한 키는 전사만, 다른 키는 정리만 맡아 두 작업이 동시에 흘러갑니다. 역할을 정하지 않으면 첫 키는 전사, 두 번째 키는 정리로 자동 배정됩니다.</p>
                 <p class="note">같은 Groq 계정의 키들은 한도를 공유하며, 다른 계정 키를 넣으면 한도 초과 시 자동 전환됩니다.</p>
               </div>
 
@@ -659,7 +676,13 @@
                   <button class="seg-btn" type="button" data-speed="1.5" aria-pressed="false">1.5x</button>
                   <button class="seg-btn" type="button" data-speed="2" aria-pressed="false">2.0x</button>
                 </div>
-                <p class="note" id="speedNote" style="margin-top:7px">배속을 올리면 소리를 먼저 빠르게 만든 뒤 받아쓰기합니다(음이 조금 높아짐). 25MB를 넘으면 배속 후 10분 단위로 나누어 처리합니다.</p>
+                <p class="note" id="speedNote" style="margin-top:7px">배속은 음 높이를 유지한 채(atempo) 소리를 빠르게 만든 뒤 받아쓰기합니다. 25MB를 넘으면 10분 조각으로 나누어 처리합니다.</p>
+
+                <div class="label-row" style="margin-top:13px">
+                  <label class="field-label">대용량 처리 방식</label>
+                  <span class="chip" id="routeChip">미리 자르기</span>
+                </div>
+                <p class="note" id="routeNote">25MB 초과나 배속은 통째로 디코딩하지 않고 조각만 메모리에 올립니다. 첫 파일에서 ffmpeg(약 32MB)를 한 번만 내려받습니다.</p>
 
                 <div style="height:12px"></div>
                 <label class="field-label" for="chatModel">요약 모델</label>
@@ -737,14 +760,15 @@
           </span>
           <span class="drop-title">오디오 파일 선택</span>
           <span class="drop-meta">여러 개를 한 번에 · 끌어다 놓아도 됩니다</span>
-          <span class="drop-meta">m4a, mp3, wav, ogg, webm, flac · 25MB 초과도 자동 분할</span>
+          <span class="drop-meta">m4a, mp3, wav, ogg, webm, flac</span>
+          <span class="drop-meta">3시간 넘는 긴 녹음도 자동으로 잘라 처리합니다</span>
         </div>
         <input type="file" id="fileInput" accept="audio/*,.m4a,.mp3,.wav,.ogg,.webm,.mp4,.flac,.aac,.opus" multiple hidden />
 
         <ul class="file-list" id="fileList"></ul>
         <div class="file-tools" id="fileTools" hidden>
           <button class="link-btn" id="clearFilesBtn" type="button">목록 비우기</button>
-          <span class="chip" id="sizeHint">파일당 25MB 초과는 자동 분할</span>
+          <span class="chip" id="sizeHint">25MB 초과는 미리 잘라서 처리</span>
         </div>
 
         <div class="controls">
@@ -769,6 +793,10 @@
           </div>
           <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
           <div class="progress-foot">
+            <span class="pipe-chips">
+              <span class="chip quiet" id="sttProg">전사 0/0</span>
+              <span class="chip quiet" id="chatProg">정리 0/0</span>
+            </span>
             <span class="eta">예상 남은 시간: <strong id="etaValue">계산 중</strong></span>
           </div>
         </div>
@@ -853,6 +881,17 @@
       var SPLIT_RATE = 16000;
       var SPLIT_SECONDS = 600;
       var SPLIT_MAX_BYTES = 24 * 1024 * 1024;
+      /* 대용량: ffmpeg(single-thread core)는 ./ffmpeg/ 에서 서빙하고 첫 사용 때만 내려받는다.
+         GitHub Pages는 COOP/COEP 헤더를 못 넣으므로 멀티스레드 core-mt는 쓸 수 없다. */
+      var FF_DIR = 'ffmpeg/';
+      var FF_MAX_PARTS = 300;
+      var COPY_MUX = {
+        m4a: 'mp4', mp4: 'mp4', m4v: 'mp4', mov: 'mp4',
+        mp3: 'mp3', aac: 'adts', flac: 'flac', wav: 'wav',
+        ogg: 'ogg', oga: 'ogg', opus: 'ogg', webm: 'webm'
+      };
+      var ROLE_NAME = { stt: '전사', chat: '정리', both: '둘 다' };
+      var DEFAULT_COOL_SEC = 15;
       var LS = {
         key: 'audio_note_api_key',
         keys: 'audio_note_keys',
@@ -865,6 +904,7 @@
         mode: 'audio_note_mode',
         custom: 'audio_note_custom_prompt',
         speed: 'audio_note_speed',
+        roles: 'audio_note_key_roles',
         settings: 'audio_note_settings_open',
         quota: 'audio_note_quota',
         usage: 'audio_note_usage'
@@ -887,8 +927,10 @@
       var settingsCard = $('settingsCard'), settingsToggle = $('settingsToggle'), settingsBtn = $('settingsBtn');
       var sumKeys = $('sumKeys'), sumModels = $('sumModels');
       var speedRange = $('speedRange'), speedSeg = $('speedSeg'), speedChip = $('speedChip'), sumSpeed = $('sumSpeed');
+      var routeChip = $('routeChip'), routeNote = $('routeNote');
       var progressWrap = $('progress'), progressText = $('progressText'), progressPct = $('progressPct');
       var progressFill = $('progressFill'), etaValue = $('etaValue');
+      var sttProg = $('sttProg'), chatProg = $('chatProg');
       var quotaChip = $('quotaChip');
       var toastEl = $('toast'), toastText = $('toastText');
 
@@ -989,7 +1031,7 @@
           if (rec.quotas && typeof rec.quotas === 'object') k.quotas = rec.quotas;
         });
       }
-      function quotaLine(k, compact) {
+      function quotaLine(k, compact, roleTxt) {
         var q = k && k.quota, now = Date.now(), head = '';
         if (q && now - (q.at || 0) < 15 * 60 * 1000) {
           var parts = [];
@@ -1000,8 +1042,9 @@
         }
         var u = usageToday(k ? k.value : '');
         var usageTxt = '오늘 사용 ' + u.req + '건' + (u.sec >= 30 ? ' · ' + Math.max(1, Math.round(u.sec / 60)) + '분' : '');
-        if (head) return u.req > 0 ? head + (compact ? ' · 오늘 ' + u.req + '건' : ' · ' + usageTxt) : head;
-        return usageTxt;
+        var pre = roleTxt ? roleTxt + ' · ' : '';
+        if (head) return pre + (u.req > 0 ? head + (compact ? ' · 오늘 ' + u.req + '건' : ' · ' + usageTxt) : head);
+        return pre + usageTxt;
       }
       function renderQuotaChip() {
         if (!quotaChip) return;
@@ -1012,7 +1055,7 @@
         var low = !!(q && q.lim && q.rem != null && (Date.now() - (q.at || 0)) < 15 * 60 * 1000 && (q.rem / q.lim) < 0.1);
         quotaChip.classList.toggle('low', low);
         quotaChip.innerHTML = '<span class="dot"></span>' +
-          escapeHtml((keys.length > 1 ? (activeKey + 1) + '번 키 · ' : '') + quotaLine(k, true));
+          escapeHtml((keys.length > 1 ? (activeKey + 1) + '번 키 · ' : '') + quotaLine(k, true, roleName(activeKey)));
       }
       function noteRateLimit(keyInfo, res, modelLabel) {
         var h = res && res.headers;
@@ -1040,17 +1083,16 @@
       }
 
       /* ---------- progress / eta ---------- */
-      var runState = { total: 0, queue: [] };
+      var runState = { total: 0, queue: [], startedMs: 0 };
       var EST_S_PER_MB = 0.9;
       function nowMs() { return (window.performance && window.performance.now) ? window.performance.now() : Date.now(); }
       function itemFraction(it) {
         if (it.status === 'done' || it.status === 'skipped' || it.status === 'error') return 1;
-        if (it.status === 'summarizing') return 0.72;
+        if (it.status === 'summarizing') return 0.82;
+        if (it.status === 'queued') return 0.62;
         if (it.status === 'transcribing') {
-          if (it.splitTotal > 1 && it.splitIndex > 0) {
-            return 0.04 + 0.28 * ((it.splitIndex - 1) / it.splitTotal);
-          }
-          return 0.32;
+          if (it.splitTotal > 1) return Math.min(0.58, 0.58 * (it.splitIndex / it.splitTotal));
+          return 0.3;
         }
         return 0;
       }
@@ -1064,20 +1106,32 @@
         m = m % 60;
         return h + '시간' + (m ? ' ' + m + '분' : '');
       }
+      /* 전사·정리 두 파이프라인의 남은 시간을 따로 추정해 늦은 쪽을 보여 준다. */
       function etaLabel() {
-        var remain = 0, doneBytes = 0, doneMs = 0;
+        var bytesLeft = 0;
         runState.queue.forEach(function (it) {
-          if (itemFraction(it) >= 1) {
-            if (it.runMs > 0 && it.size > 0) { doneBytes += it.size; doneMs += it.runMs; }
-          } else {
-            remain += it.size;
+          if (it.status === 'pending') bytesLeft += it.size || 0;
+          else if (it.status === 'transcribing') {
+            var f = it.splitTotal > 1 ? Math.min(1, it.splitIndex / it.splitTotal) : 0;
+            bytesLeft += (it.size || 0) * (1 - f);
           }
         });
-        if (!remain) return '거의 끝났어요';
-        if (doneBytes > 0) return '약 ' + fmtDur(remain * (doneMs / doneBytes) / 1000);
-        var guess = (remain / (1024 * 1024)) * EST_S_PER_MB + 3;
-        if (guess < 15) return '계산 중';
-        return '계산 중 (약 ' + fmtDur(guess) + ')';
+        var sttSec = 0;
+        if (bytesLeft > 0) {
+          if (PIPE.sttBytes > 0 && PIPE.sttMs > 2000) sttSec = (bytesLeft / (PIPE.sttBytes / PIPE.sttMs)) / 1000;
+          else sttSec = (bytesLeft / (1024 * 1024)) * EST_S_PER_MB + 3;
+        }
+        var chatLeft = PIPE.chatQ.length + PIPE.chatRun;
+        var chatSec = 0;
+        if (chatLeft > 0) {
+          if (PIPE.chatItems > 0 && PIPE.chatMs > 1500) chatSec = chatLeft / (PIPE.chatItems / (PIPE.chatMs / 1000));
+          else chatSec = 25 * chatLeft;
+        }
+        if (!sttSec && !chatSec) return '거의 끝났어요';
+        if (sttSec <= 0) return '약 ' + fmtDur(chatSec) + ' (정리 기준)';
+        if (chatSec <= 0) return '약 ' + fmtDur(sttSec) + ' (전사 기준)';
+        var by = sttSec >= chatSec ? '전사 기준' : '정리 기준';
+        return '약 ' + fmtDur(Math.max(sttSec, chatSec)) + ' (' + by + ')';
       }
       function updateProgressBar() {
         if (!progressWrap) return;
@@ -1093,7 +1147,14 @@
         var pct = Math.max(3, Math.min(100, Math.round((sum / runState.total) * 100)));
         progressFill.style.width = pct + '%';
         progressPct.textContent = pct + '%';
-        progressText.textContent = done + ' / ' + runState.total + ' 처리 중';
+        progressText.textContent = done + ' / ' + runState.total + ' 파일 완료';
+        var sttTotal = PIPE.sttDone + PIPE.sttRun + PIPE.sttQ.length;
+        var chatTotal = PIPE.chatDone + PIPE.chatRun + PIPE.chatQ.length;
+        if (sttProg) sttProg.textContent = '전사 ' + PIPE.sttDone + '/' + sttTotal;
+        if (chatProg) {
+          chatProg.hidden = !chatTotal;
+          chatProg.textContent = '정리 ' + PIPE.chatDone + '/' + chatTotal;
+        }
         if (etaValue) etaValue.textContent = etaLabel();
       }
 
@@ -1125,18 +1186,50 @@
       }
       function persistKeys() {
         write(LS.keys, JSON.stringify(keys.map(function (k) { return k.value; })));
+        write(LS.roles, JSON.stringify(keys.map(function (k) { return k.role || ''; })));
         write(LS.activeKey, String(activeKey));
+      }
+      /* 키 역할: '' = 자동. 키 1개는 한 키가 다 하고, 2개는 둘 다 정리+전사(노는 키가 전사),
+         3개 이상은 정리 2 + 전사 1(전사는 노는 키 우선). */
+      function autoRole(i) {
+        if (keys.length <= 2) return 'both';
+        return i < 2 ? 'chat' : 'stt';
+      }
+      function keyRole(i) {
+        var r = keys[i] && keys[i].role;
+        if (r === 'stt' || r === 'chat' || r === 'both') return r;
+        return autoRole(i);
+      }
+      function roleName(i) { return ROLE_NAME[keyRole(i)] || '전사'; }
+      function rolePool(role) {
+        var out = [];
+        for (var i = 0; i < keys.length; i++) {
+          var r = keyRole(i);
+          if (r === role || r === 'both') out.push(i);
+        }
+        return out;
+      }
+      function roleLabel(role) { return role === 'chat' ? '정리' : '전사'; }
+      function renderRolesNote() {
+        renderSettingsSummary();
+        renderQuotaChip();
       }
       function loadKeys() {
         var raw = read(LS.keys);
+        var roles = [];
+        try {
+          var rr = JSON.parse(read(LS.roles) || '[]');
+          if (Object.prototype.toString.call(rr) === '[object Array]') roles = rr;
+        } catch (e) { roles = []; }
         if (raw) {
           try {
             var arr = JSON.parse(raw);
             if (Object.prototype.toString.call(arr) === '[object Array]') {
-              arr.forEach(function (v) {
+              arr.forEach(function (v, i) {
                 if (typeof v === 'string' && v.trim()) {
                   keySeq += 1;
-                  keys.push({ id: 'k' + keySeq, value: v.trim() });
+                  var r = roles[i];
+                  keys.push({ id: 'k' + keySeq, value: v.trim(), role: (r === 'stt' || r === 'chat' || r === 'both') ? r : '' });
                 }
               });
             }
@@ -1154,19 +1247,26 @@
         var act = parseInt(read(LS.activeKey), 10);
         activeKey = (isNaN(act) || act < 0 || act >= keys.length) ? 0 : act;
       }
-      function keyOrder() {
-        var out = [];
-        for (var i = 0; i < keys.length; i++) {
-          var idx = (activeKey + i) % keys.length;
-          out.push({ value: keys[idx].value, num: idx + 1, listIndex: idx, id: keys[idx].id });
-        }
-        return out;
-      }
       function setActiveKey(idx) {
         if (idx < 0 || idx >= keys.length) return;
         activeKey = idx;
         persistKeys();
         renderKeys();
+      }
+      function roleSelectHtml(i) {
+        var r = keys[i].role || '';
+        function opt(v, label) {
+          return '<option value="' + v + '"' + (r === v ? ' selected' : '') + '>' + label + '</option>';
+        }
+        return '<span class="select-wrap key-role">' +
+          '<select class="role-select" data-role="' + i + '" aria-label="' + (i + 1) + '번 키 역할">' +
+            opt('', '자동 · ' + ROLE_NAME[autoRole(i)]) +
+            opt('stt', '전사') +
+            opt('chat', '정리') +
+            opt('both', '둘 다') +
+          '</select>' +
+          '<svg class="ic ic-sm chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9.5l6 6 6-6"></path></svg>' +
+        '</span>';
       }
       function renderKeys() {
         keyList.innerHTML = '';
@@ -1182,9 +1282,10 @@
                   '<span class="key-mask">' + escapeHtml(maskKey(k.value)) + '</span>' +
                   '<span class="key-flag' + (i === activeKey ? '' : ' idle') + '">' + escapeHtml(flag) + '</span>' +
                 '</span>' +
-                '<span class="key-meta">' + escapeHtml(quotaLine(k)) + '</span>' +
+                '<span class="key-meta">' + escapeHtml(quotaLine(k, false, roleName(i))) + '</span>' +
               '</span>' +
             '</button>' +
+            roleSelectHtml(i) +
             '<button class="icon-btn sm" type="button" data-del="' + i + '" aria-label="' + (i + 1) + '번 키 삭제">' +
               '<svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>' +
             '</button>';
@@ -1195,12 +1296,26 @@
         renderQuotaChip();
         updateRunButton();
       }
+      keyList.addEventListener('change', function (e) {
+        var sel = e.target.closest ? e.target.closest('[data-role]') : null;
+        if (!sel) return;
+        var i = parseInt(sel.getAttribute('data-role'), 10);
+        if (isNaN(i) || !keys[i]) return;
+        var v = sel.value;
+        keys[i].role = (v === 'stt' || v === 'chat' || v === 'both') ? v : '';
+        persistKeys();
+        renderKeys();
+        if (busy) setStatus('키 역할은 다음 실행부터 적용됩니다.', false, false);
+      });
       function renderSettingsSummary() {
         if (sumKeys) {
           sumKeys.textContent = keys.length ? 'API 키 ' + keys.length + '개 등록' : 'API 키 없음';
           sumKeys.classList.toggle('warn', keys.length === 0);
         }
         if (sumModels) sumModels.textContent = STT[sttChoice].name + ' · ' + prettyModel(chatModel.value);
+        if (sumModels && keys.length > 1) {
+          sumModels.textContent += ' · 정리 ' + Math.max(1, rolePool('chat').length) + ' · 전사 ' + Math.max(1, rolePool('stt').length);
+        }
         renderSpeed();
       }
 
@@ -1462,17 +1577,25 @@
           duration: 0,
           probing: false,
           runMs: 0,
+          sttMs: 0,
+          runMode: '',
+          route: '',
+          routeNote: '',
+          splitMethod: '',
+          keysUsed: [],
           startedAt: 0
         };
       }
       function statusTextOf(it) {
         if (it.status === 'pending') return '대기';
+        if (it.status === 'queued') return '정리 대기';
         if (it.status === 'transcribing') {
-          if (it.splitTotal > 1 && it.splitIndex > 0) {
-            return '분할 받아쓰기 (' + Math.min(it.splitIndex, it.splitTotal) + '/' + it.splitTotal + ')';
+          if (it.loadingFF) return '분할 준비 중 (1회 로딩)';
+          if (it.splitTotal > 1) {
+            return '분할 전사 (' + Math.min(it.splitIndex, it.splitTotal) + '/' + it.splitTotal + ' 완료)';
           }
-          if (it.speed > 1.0001) return it.splitIndex ? '배속 받아쓰기 중' : '배속 준비 중';
-          return it.big ? '분할 준비 중' : '받아쓰기 중';
+          if (it.speed > 1.0001) return it.splitIndex ? '배속 전사 중' : '배속 준비 중';
+          return it.big ? '분할 준비 중' : '전사 중';
         }
         if (it.status === 'summarizing') return '정리 중';
         if (it.status === 'done') return '완료';
@@ -1832,9 +1955,302 @@
           step();
         });
       }
+      /* ---------- ffmpeg: 디코딩 전에 자르기 (single-thread core, ./ffmpeg/ 서빙) ---------- */
+      var ffState = { inst: null, pending: null, failed: false, loadMs: 0, logs: [] };
+      var ffChain = Promise.resolve();
 
-      /* 25MB 초과 또는 배속: 디코딩 → (배속) → 16kHz 모노 WAV 한 개 또는 10분 청크들 → 순서대로 받아쓰기 */
-      function transcribeSplit(ks, it, lang, speed) {
+      function ffmpegSupported() {
+        if (location.protocol !== 'http:' && location.protocol !== 'https:') return false;
+        if (typeof Worker === 'undefined' || typeof WebAssembly === 'undefined') return false;
+        return true;
+      }
+      function ffUrl(name) {
+        try { return new URL(FF_DIR + name, location.href).href; } catch (e) { return FF_DIR + name; }
+      }
+      function ffFallbackError() {
+        var e = new Error('ffmpeg를 준비하지 못했습니다.');
+        e.ffFallback = true;
+        return e;
+      }
+      function loadScriptOnce(src) {
+        return new Promise(function (resolve, reject) {
+          if (window.FFmpegWASM && window.FFmpegWASM.FFmpeg) { resolve(); return; }
+          var s = document.createElement('script');
+          s.src = src;
+          s.async = true;
+          s.setAttribute('data-ffmpeg', '1');
+          s.onload = function () {
+            if (window.FFmpegWASM && window.FFmpegWASM.FFmpeg) resolve();
+            else reject(new Error('ffmpeg 로더를 읽지 못했습니다.'));
+          };
+          s.onerror = function () { reject(new Error('ffmpeg 로더를 읽지 못했습니다.')); };
+          document.head.appendChild(s);
+        });
+      }
+      /* 첫 대용량 파일에서만 부른다. 실패하면 ffState.failed 로 남겨 이후 파일은 디코딩 경로로 간다. */
+      function loadFFmpeg() {
+        if (ffState.inst && ffState.inst.loaded) return Promise.resolve(ffState.inst);
+        if (ffState.pending) return ffState.pending;
+        if (!ffmpegSupported()) {
+          ffState.failed = true;
+          renderRouteState();
+          return Promise.reject(ffFallbackError());
+        }
+        var started = nowMs();
+        ffState.pending = loadScriptOnce(ffUrl('ffmpeg.js')).then(function () {
+          var NS = window.FFmpegWASM;
+          if (!NS || !NS.FFmpeg) throw new Error('ffmpeg 로더가 비어 있습니다.');
+          var inst = new NS.FFmpeg();
+          inst.on('log', function (e) {
+            var line = e && e.message ? String(e.message) : String(e);
+            ffState.logs.push(line);
+            if (ffState.logs.length > 80) ffState.logs.shift();
+          });
+          return inst.load({
+            coreURL: ffUrl('ffmpeg-core.js'),
+            wasmURL: ffUrl('ffmpeg-core.wasm')
+          }).then(function () {
+            ffState.inst = inst;
+            ffState.loadMs = Math.round(nowMs() - started);
+            ffState.failed = false;
+            renderRouteState();
+            return inst;
+          });
+        }).catch(function (err) {
+          ffState.failed = true;
+          ffState.pending = null;
+          renderRouteState();
+          var e = ffFallbackError();
+          e.cause = err && err.message ? err.message : String(err);
+          throw e;
+        });
+        return ffState.pending;
+      }
+      /* ffmpeg 인스턴스는 하나뿐이고 /input 마운트도 하나라, 마운트~실행~읽기 구간을 직렬화한다. */
+      function ffSerial(fn) {
+        var p = ffChain.then(fn, fn);
+        ffChain = p.then(function () {}, function () {});
+        return p;
+      }
+      function mountInput(inst, file) {
+        function doMount() {
+          return inst.mount(NS_WORKERFS(), { files: [file] }, '/input').then(function (ok) {
+            if (ok === false) throw new Error('WORKERFS 마운트에 실패했습니다.');
+            return true;
+          });
+        }
+        return doMount().catch(function () {
+          return inst.createDir('/input').catch(function () {}).then(doMount);
+        });
+      }
+      function NS_WORKERFS() {
+        var NS = window.FFmpegWASM;
+        if (NS && NS.FFFSType && NS.FFFSType.WORKERFS) return NS.FFFSType.WORKERFS;
+        return 'WORKERFS';
+      }
+      function unmountInput(inst) {
+        if (!inst) return Promise.resolve();
+        return inst.unmount('/input').catch(function () {});
+      }
+      /* -c copy 로 만든 조각이 실제로 읽히는지 짧게 확인한다(깨졌으면 다음 방식으로). */
+      function probeMini(inst, path) {
+        var mark = ffState.logs.length;
+        return inst.exec(['-hide_banner', '-v', 'error', '-ss', '0', '-t', '3', '-i', path, '-f', 'null', '-']).then(function (ret) {
+          if (ret !== 0) return false;
+          var tail = ffState.logs.slice(mark).join('\n');
+          return !/Invalid data|Error while decoding|moov atom not found|could not find codec|no decoder/i.test(tail);
+        }, function () { return false; });
+      }
+
+      function extOf(name) {
+        var m = /\.([a-z0-9]+)$/i.exec(String(name || ''));
+        return m ? m[1].toLowerCase() : '';
+      }
+      function copyMux(name) { return COPY_MUX[extOf(name)] || ''; }
+      function mimeOf(ext) {
+        if (ext === 'wav') return 'audio/wav';
+        if (ext === 'mp3') return 'audio/mpeg';
+        if (ext === 'flac') return 'audio/flac';
+        if (ext === 'ogg' || ext === 'oga' || ext === 'opus') return 'audio/ogg';
+        if (ext === 'webm') return 'audio/webm';
+        if (ext === 'aac') return 'audio/aac';
+        return 'audio/mp4';
+      }
+      /* 경로 판정: 원본 그대로 / ffmpeg 로 자르기·배속 / 브라우저 디코딩 */
+      function chooseRoute(it, speed) {
+        if (speed <= 1.0001 && it.size <= MAX_BYTES) return 'direct';
+        if (!ffmpegSupported() || ffState.failed) return 'decode';
+        if (speed > 1.0001) return 'atempo';
+        if (copyMux(it.name)) return 'copy';
+        return 'reencode';
+      }
+      function renderRouteState() {
+        if (!routeChip) return;
+        var ok = ffmpegSupported() && !ffState.failed;
+        routeChip.textContent = ok ? '미리 자르기' : '브라우저 디코딩';
+        routeChip.classList.toggle('warn', !ok);
+        if (!routeNote) return;
+        if (!ffmpegSupported()) {
+          routeNote.textContent = '이 환경에서는 미리 자르기를 쓸 수 없어 브라우저 디코딩으로 처리합니다. 아주 긴 녹음은 메모리가 부족할 수 있습니다.';
+        } else if (ffState.failed) {
+          routeNote.textContent = 'ffmpeg를 내려받지 못해 브라우저 디코딩으로 처리합니다. 네트워크를 확인한 뒤 새로고침하면 다시 시도합니다.';
+        } else if (ffState.loadMs) {
+          routeNote.textContent = 'ffmpeg 준비됨(' + (Math.round(ffState.loadMs / 100) / 10) + '초 로딩). 25MB 초과·배속 파일은 조각만 메모리에 올립니다.';
+        } else {
+          routeNote.textContent = '25MB 초과나 배속은 통째로 디코딩하지 않고 조각만 메모리에 올립니다. 첫 파일에서 ffmpeg(약 32MB)를 한 번만 내려받습니다.';
+        }
+      }
+
+      /* ---------- 파이프라인: 키 역할별 전사/정리 워커 ---------- */
+      var PIPE = {
+        sttQ: [], chatQ: [], sttRun: 0, chatRun: 0,
+        busy: {}, cool: {}, total: 0,
+        sttDone: 0, chatDone: 0, sttBytes: 0, sttMs: 0, chatItems: 0, chatMs: 0,
+        startedMs: 0
+      };
+      var keyWaiters = [];
+
+      function keyInfoOf(i) {
+        return { value: keys[i].value, num: i + 1, listIndex: i, id: keys[i].id };
+      }
+      function releaseKey(i) {
+        PIPE.busy[i] = false;
+        var list = keyWaiters;
+        keyWaiters = [];
+        list.forEach(function (fn) { fn(); });
+      }
+      function waitKey() {
+        return new Promise(function (res) { keyWaiters.push(res); });
+      }
+      function coolLeft(keysInRole) {
+        var now = Date.now(), best = 0, i;
+        for (i = 0; i < keys.length; i++) {
+          if (keysInRole && keysInRole.indexOf(i) === -1) continue;
+          var left = (PIPE.cool[i] || 0) - now;
+          if (left > 0 && (!best || left < best)) best = left;
+        }
+        return best;
+      }
+      /* 역할에 맞는 빈 키 하나를 고른다. 역할 키가 하나도 없으면 다른 키로도 처리한다. */
+      function takeKey(role, skip) {
+        var now = Date.now(), prefer = [], shared = [], other = [], i;
+        for (i = 0; i < keys.length; i++) {
+          if (PIPE.busy[i] || (PIPE.cool[i] || 0) > now || (skip && skip[i])) continue;
+          var r = keyRole(i);
+          if (r === role) prefer.push(i);
+          else if (r === 'both') shared.push(i);
+          else other.push(i);
+        }
+        if (prefer.length) return prefer[0];
+        if (shared.length) return shared[0];
+        if (!rolePool(role).length && other.length) return other[0];
+        return -1;
+      }
+      /* 키 하나를 잡아 요청 하나를 보낸다. 그 키가 429면 쿨다운시키고 역할 안의 다른 키로 넘긴다. */
+      function withKey(role, attempt) {
+        var tried = {}, guard = 0;
+        function go() {
+          guard += 1;
+          if (guard > 400) {
+            return Promise.reject(new Error(roleLabel(role) + '에 쓸 수 있는 키가 없습니다. 설정에서 키 역할을 확인해 주세요.'));
+          }
+          var idx = takeKey(role, tried);
+          if (idx >= 0) {
+            PIPE.busy[idx] = true;
+            return Promise.resolve().then(function () {
+              return attempt(keyInfoOf(idx));
+            }).then(function (val) {
+              releaseKey(idx);
+              return val;
+            }, function (err) {
+              releaseKey(idx);
+              if (err && err.rateLimited) {
+                var sec = err.waitSec > 0 ? Math.min(Math.max(err.waitSec, 1), 300) : DEFAULT_COOL_SEC;
+                PIPE.cool[idx] = Date.now() + sec * 1000;
+                tried[idx] = true;
+                var all = true, t;
+                for (t = 0; t < keys.length; t++) { if (!tried[t]) all = false; }
+                if (all) tried = {};
+                if (keys.length > 1) {
+                  addNotice((idx + 1) + '번 키가 한도(429)에 걸려 잠시 쉬고, ' + roleLabel(role) + ' 역할의 다른 키로 넘깁니다.');
+                }
+                return go();
+              }
+              throw err;
+            });
+          }
+          var pool = rolePool(role);
+          var left = coolLeft(pool.length ? pool : null);
+          if (left > 0) {
+            setStatus(roleLabel(role) + ' 키가 한도 대기 중 · 약 ' + Math.ceil(left / 1000) + '초 뒤 이어서 ' + roleLabel(role) + '합니다', true, false);
+          }
+          return Promise.race([waitKey(), sleep(Math.min(Math.max(left, 300), 3000))]).then(go);
+        }
+        return go();
+      }
+
+      /* ---------- 받아쓰기 요청 (조각 1개 = 요청 1개) ---------- */
+      /* opts: { file, seconds, label, allowEmpty } — 분할 조각은 조각 파일을 file로 넘긴다. */
+      function sttChunk(it, lang, opts) {
+        opts = opts || {};
+        return withKey('stt', function (ki) {
+          return sttAttemptKey(ki, it, lang, opts);
+        });
+      }
+      function sttAttemptKey(ki, it, lang, opts) {
+        var upload = opts.file || it.file;
+        var seconds = opts.seconds || 0;
+        var label = opts.label || '받아쓰기';
+        var models = sttChoice === 'turbo' ? ['turbo', 'large'] : ['large', 'turbo'];
+        var lastWait = 0;
+
+        function attemptModel(mi) {
+          if (mi >= models.length) {
+            var e = new Error('rate limited');
+            e.rateLimited = true;
+            e.waitSec = lastWait;
+            e.keyNum = ki.num;
+            throw e;
+          }
+          var model = STT[models[mi]];
+          it.status = 'transcribing';
+          it.error = '';
+          setStatus(label + ' 중 · ' + it.name + ' · ' + model.name + (keys.length > 1 ? ' · ' + ki.num + '번 키' : ''), true, false);
+          return sttRequest(ki.value, upload, model.id, lang).then(function (res) {
+            noteRateLimit(ki, res, model.name);
+            if (res.status === 429) {
+              lastWait = retryAfter(res);
+              return attemptModel(mi + 1);
+            }
+            if (!res.ok) {
+              return friendlyError(res, '받아쓰기').then(function (msg) { throw new Error(msg); });
+            }
+            return res.json().then(function (data) {
+              var text = (data && data.text ? data.text : '').trim();
+              if (!text && !opts.allowEmpty) {
+                throw new Error('음성을 인식하지 못했습니다. 이 파일을 건너뛰고 다른 녹음을 확인해 주세요.');
+              }
+              it.sttUsed = models[mi];
+              it.sttFallback = it.sttFallback || mi > 0;
+              it.keyNum = ki.num;
+              if (!it.keysUsed) it.keysUsed = [];
+              if (it.keysUsed.indexOf(ki.num) === -1) it.keysUsed.push(ki.num);
+              recordUsage(ki.value, 'stt', seconds || it.duration || it.size / 2000);
+              renderQuotaChip();
+              if (keys.length > 1) noteKeySwitch(ki);
+              if (mi > 0) {
+                addNotice("'" + model.name + "' 모델(" + model.id + ')로 자동 전환해 받아쓰기했습니다. 앞선 모델이 한도(429)에 걸렸습니다.');
+              }
+              return text;
+            });
+          });
+        }
+        return attemptModel(0);
+      }
+
+      /* 25MB 초과 또는 배속: 디코딩 → (배속) → 16kHz 모노 WAV 한 개 또는 10분 청크들 → 순서대로 받아쓰기
+         (ffmpeg를 못 쓰는 브라우저·실패 시의 마지막 경로) */
+      function transcribeSplit(it, lang, speed) {
         var cleanup = function () {};
         var texts = [];
         var silent = 0;
@@ -1865,8 +2281,6 @@
             updateCard(it);
             function step(i) {
               if (i >= parts) return Promise.resolve(texts);
-              it.splitIndex = i + 1;
-              updateCard(it);
               var start = i * per;
               var stop = Math.min(outLen, start + per);
               var tag = parts > 1 ? '분할 받아쓰기 (' + (i + 1) + '/' + parts + ')' : '받아쓰기';
@@ -1874,13 +2288,16 @@
               return encodeWavChunk(audio, start, stop).then(function (blob) {
                 var name = (parts > 1 ? it.base + '-part' + (i + 1) + 'of' + parts : it.base) + '.wav';
                 var chunk = new File([blob], name, { type: 'audio/wav', lastModified: Date.now() });
-                return transcribe(ks, it, lang, {
+                return sttChunk(it, lang, {
                   file: chunk,
                   seconds: (stop - start) / SPLIT_RATE,
                   label: tag,
                   allowEmpty: true
                 }).then(function (text) {
                   if (text) texts.push(text); else silent += 1;
+                  it.splitIndex = i + 1;
+                  updateCard(it);
+                  updateProgressBar();
                   return step(i + 1);
                 });
               });
@@ -1889,9 +2306,9 @@
           });
         });
 
-        return work.then(function (texts) {
+        return work.then(function (list) {
           cleanup();
-          if (!texts.length) {
+          if (!list.length) {
             throw new Error('음성을 인식하지 못했습니다. 이 파일에서 말소리를 찾지 못했으니 다른 녹음을 확인해 주세요.');
           }
           if (it.splitTotal > 1) {
@@ -1901,10 +2318,9 @@
             addNotice(it.name + ': 구간 ' + silent + '개에서는 음성을 인식하지 못했습니다.');
           }
           it.splitIndex = it.splitTotal;
-          return texts.join('\n\n');
+          return list.join('\n\n');
         }, function (err) {
           cleanup();
-          /* 일부 구간이라도 받아쓰기했으면 그 텍스트는 남긴다. */
           if (texts.length) {
             it.transcript = texts.join('\n\n');
             it.tab = 'transcript';
@@ -1914,62 +2330,214 @@
         });
       }
 
-      /* ---------- transcribe with per-file 429 fallback ---------- */
-      /* opts: { file, seconds, label, allowEmpty } — 분할 청크는 청크 파일을 file로 넘긴다. */
-      function transcribe(ks, it, lang, opts) {
-        opts = opts || {};
-        var upload = opts.file || it.file;
-        var seconds = opts.seconds || 0;
-        var label = opts.label || '받아쓰기';
-        var models = sttChoice === 'turbo' ? ['turbo', 'large'] : ['large', 'turbo'];
+      /* ---------- ffmpeg로 잘라 가며 받아쓰기 ---------- */
+      /* 원본 File은 WORKERFS로 마운트해 읽고, 출력 조각은 하나씩 MEMFS에 만든 뒤 바로 보내고 지운다. */
+      function transcribeFfmpeg(it, lang, speed) {
+        var texts = [];
+        var silent = 0;
+        var parts = 0;
+        var produced = 0;
+        var eof = false;
+        var inst = null;
+        var inPath = '/input/' + (it.file.name || ('in-' + it.id));
 
-        function attemptKey(ki) {
-          if (ki >= ks.length) {
-            return Promise.reject(new Error('받아쓰기 한도(429): 등록한 ' + ks.length + '개 키의 두 모델이 모두 지금은 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.'));
+        it.status = 'transcribing';
+        it.splitIndex = 0;
+        it.splitTotal = 0;
+        it.splitMethod = '';
+        it.loadingFF = !(ffState.inst && ffState.inst.loaded);
+        setStatus((it.loadingFF ? '분할 준비 중 (ffmpeg 1회 로딩) · ' : '분할 준비 중 · ') + it.name, true, false);
+        updateCard(it);
+
+        function planFor(route) {
+          var dur = it.duration || 0;
+          if (route === 'copy') {
+            var sec = SPLIT_SECONDS;
+            if (dur > 0) {
+              var bps = it.size / dur;
+              sec = Math.floor((SPLIT_MAX_BYTES * 0.78) / bps);
+              if (sec > SPLIT_SECONDS) sec = SPLIT_SECONDS;
+            }
+            return { route: route, sec: sec, ext: extOf(it.name) || 'm4a', mux: copyMux(it.name), shift: 1, dur: dur };
           }
-          var keyInfo = ks[ki];
+          return { route: route, sec: SPLIT_SECONDS, ext: 'wav', mux: 'wav', shift: route === 'atempo' ? speed : 1, dur: dur };
+        }
+        function argsFor(plan, index, outPath) {
+          if (plan.route === 'copy') {
+            return ['-hide_banner', '-nostdin', '-ss', String(index * plan.sec), '-i', inPath,
+              '-t', String(plan.sec), '-vn', '-c:a', 'copy', '-f', plan.mux, outPath];
+          }
+          var a = ['-hide_banner', '-nostdin', '-ss', String(index * plan.sec * plan.shift), '-i', inPath,
+            '-t', String(plan.sec * plan.shift), '-vn'];
+          if (plan.route === 'atempo') a.push('-filter:a', 'atempo=' + speed);
+          a.push('-ac', '1', '-ar', String(SPLIT_RATE), '-c:a', 'pcm_s16le', '-f', 'wav', outPath);
+          return a;
+        }
 
+        function runRoute(plan) {
+          var total = plan.dur > 0 ? Math.max(1, Math.ceil((plan.dur / plan.shift) / plan.sec)) : 0;
+          it.splitTotal = total;
+          updateCard(it);
+
+          function step() {
+            if (eof || produced >= FF_MAX_PARTS) return Promise.resolve();
+            if (total && produced >= total) return Promise.resolve();
+            var index = produced;
+            var outPath = '/out-' + it.id + '-' + index + '.' + plan.ext;
+            return ffSerial(function () {
+              var buf = null;
+              return mountInput(inst, it.file).then(function () {
+                return inst.exec(argsFor(plan, index, outPath));
+              }).then(function (ret) {
+                if (ret !== 0) {
+                  var e = new Error('ffmpeg 실행 실패');
+                  e.ffmpeg = true;
+                  throw e;
+                }
+                if (plan.route === 'copy' && index === 0) return probeMini(inst, outPath);
+                return true;
+              }).then(function (ok) {
+                if (ok === false) {
+                  var e2 = new Error('-c copy 결과가 깨졌습니다.');
+                  e2.ffmpeg = true;
+                  throw e2;
+                }
+                return inst.readFile(outPath, 'binary');
+              }).then(function (data) {
+                buf = data;
+                return inst.deleteFile(outPath).catch(function () {});
+              }, function (err) {
+                return inst.deleteFile(outPath).catch(function () {}).then(function () { throw err; });
+              }).then(function () {
+                return unmountInput(inst);
+              }).then(function () {
+                return buf;
+              });
+            }).then(function (data) {
+              var size = data && data.length ? data.length : 0;
+              if (!size) { eof = true; return; }
+              if (size > SPLIT_MAX_BYTES) {
+                var e = new Error('조각이 24MB를 넘습니다.');
+                e.ffmpeg = true;
+                throw e;
+              }
+              var mime = mimeOf(plan.ext);
+              var part = produced + 1;
+              var fname = (total !== 1 ? it.base + '-part' + part + (total ? 'of' + total : '') : it.base) + '.' + plan.ext;
+              var chunk = new File([new Blob([data], { type: mime })], fname, { type: mime, lastModified: Date.now() });
+              data = null;
+              produced = part;
+              it.splitIndex = part;
+              updateCard(it);
+              updateProgressBar();
+              return sttChunk(it, lang, {
+                file: chunk,
+                seconds: plan.sec,
+                label: total > 1 ? '분할 받아쓰기 (' + part + '/' + total + ')' : '받아쓰기',
+                allowEmpty: true
+              }).then(function (text) {
+                if (text) texts.push(text); else silent += 1;
+                parts = produced;
+                updateCard(it);
+                return step();
+              });
+            });
+          }
+          return step();
+        }
+
+        function routeList() {
+          if (speed > 1.0001) return ['atempo'];
+          return copyMux(it.name) ? ['copy', 'reencode'] : ['reencode'];
+        }
+        function tryRoute(ri) {
+          var list = routeList();
+          if (ri >= list.length) {
+            if (!parts) throw ffFallbackError();
+            return Promise.resolve();
+          }
+          var route = list[ri];
+          var plan = planFor(route);
+          if (route === 'copy' && plan.sec < 20) return tryRoute(ri + 1);
+          it.splitMethod = route;
+          var sent = parts;
+          return runRoute(plan).then(function () {}, function (err) {
+            /* 아직 아무 조각도 보내지 않았으면 다음 방식으로 넘어간다. */
+            if (parts === sent) return tryRoute(ri + 1);
+            throw err;
+          });
+        }
+
+        return loadFFmpeg().then(function (ff) {
+          inst = ff;
+          it.loadingFF = false;
+          updateCard(it);
+          return tryRoute(0);
+        }).then(function () {
+          if (!texts.length) {
+            throw new Error('음성을 인식하지 못했습니다. 이 파일에서 말소리를 찾지 못했으니 다른 녹음을 확인해 주세요.');
+          }
+          if (parts > 1) addNotice(it.name + ': ' + parts + '개 구간으로 나누어 받아쓰기한 뒤 하나로 합쳤습니다.');
+          if (silent) addNotice(it.name + ': 구간 ' + silent + '개에서는 음성을 인식하지 못했습니다.');
+          it.splitTotal = parts;
+          it.splitIndex = parts;
+          updateCard(it);
+          return texts.join('\n\n');
+        }, function (err) {
+          if (texts.length) {
+            it.transcript = texts.join('\n\n');
+            it.tab = 'transcript';
+            err.message = err.message + ' (' + texts.length + '/' + (parts || '?') + '개 구간까지 받아쓰기한 텍스트만 남겼습니다.)';
+          }
+          throw err;
+        });
+      }
+
+      /* ---------- 정리(요약·필기) 요청 ---------- */
+      /* 모델 폴백(선택 → gpt-oss-20b → gpt-oss-120b)은 조각/파일 단위로, 키 전환은 정리 역할 안에서. */
+      function askChat(system, user, label) {
+        var models = chatOrder();
+        return withKey('chat', function (ki) {
+          var lastWait = 0;
           function attemptModel(mi) {
-            if (mi >= models.length) return attemptKey(ki + 1);
-            var model = STT[models[mi]];
-            it.status = 'transcribing';
-            it.error = '';
-            updateCard(it);
-            setStatus(label + ' 중 · ' + it.name + ' · ' + model.name + (ks.length > 1 ? ' · ' + keyInfo.num + '번 키' : ''), true, false);
-
-            return sttRequest(keyInfo.value, upload, model.id, lang).then(function (res) {
-              noteRateLimit(keyInfo, res, model.name);
-              if (res.status === 429) return attemptModel(mi + 1);
+            if (mi >= models.length) {
+              var e = new Error('rate limited');
+              e.rateLimited = true;
+              e.waitSec = lastWait;
+              e.keyNum = ki.num;
+              throw e;
+            }
+            var model = models[mi];
+            setStatus(label + ' 중 · ' + prettyModel(model) + (keys.length > 1 ? ' · ' + ki.num + '번 키' : ''), true, false);
+            return chatRequest(ki.value, model, system, user).then(function (res) {
+              noteRateLimit(ki, res, prettyModel(model));
+              if (res.status === 429) {
+                lastWait = retryAfter(res);
+                if (mi + 1 < models.length) {
+                  addNotice("'" + prettyModel(model) + "' 모델 한도(429)에 걸려 '" + prettyModel(models[mi + 1]) + "' 모델로 전환합니다.");
+                }
+                return attemptModel(mi + 1);
+              }
               if (!res.ok) {
-                return friendlyError(res, '받아쓰기').then(function (msg) { throw new Error(msg); });
+                return friendlyError(res, label).then(function (msg) { throw new Error(msg); });
               }
               return res.json().then(function (data) {
-                var text = (data && data.text ? data.text : '').trim();
-                if (!text) {
-                  if (opts.allowEmpty) return '';
-                  throw new Error('음성을 인식하지 못했습니다. 이 파일을 건너뛰고 다른 녹음을 확인해 주세요.');
-                }
-                it.sttUsed = models[mi];
-                it.sttFallback = mi > 0;
-                it.keyNum = keyInfo.num;
-                recordUsage(keyInfo.value, 'stt', seconds || it.duration || it.size / 2000);
-                renderQuotaChip();
-                if (ks.length > 1) noteKeySwitch(keyInfo);
-                if (mi > 0) {
-                  addNotice("'" + model.name + "' 모델(" + model.id + ')로 자동 전환해 받아쓰기했습니다. 앞선 모델이 한도(429)에 걸렸습니다.');
-                }
-                return text;
+                var choice = data && data.choices && data.choices[0];
+                var content = choice && choice.message && choice.message.content ? choice.message.content.trim() : '';
+                if (!content) throw new Error(label + ' 결과가 비어 있습니다. 잠시 후 다시 시도해 주세요.');
+                recordUsage(ki.value, 'chat', 0);
+                if (keys.length > 1) noteKeySwitch(ki);
+                return { text: content, model: model, keyNum: ki.num };
               });
             });
           }
           return attemptModel(0);
-        }
-        return attemptKey(0);
+        });
       }
 
       function noteKeySwitch(keyInfo) {
         if (keyInfo.listIndex === activeKey) return false;
-        addNotice(keyInfo.num + '번 키로 자동 전환했습니다. 앞선 키가 한도(429)에 걸렸습니다.');
+        addNotice(keyInfo.num + '번 키로 전환했습니다. 앞선 키가 한도(429)에 걸렸습니다.');
         setActiveKey(keyInfo.listIndex);
         return true;
       }
@@ -2009,58 +2577,6 @@
         if (order.indexOf(CHAT_FALLBACK) === -1) order.push(CHAT_FALLBACK);
         if (order.indexOf(CHAT_FALLBACK2) === -1) order.push(CHAT_FALLBACK2);
         return order;
-      }
-      function askModel(ks, system, user, label) {
-        var models = chatOrder();
-
-        function attemptKey(ki) {
-          if (ki >= ks.length) {
-            return Promise.reject(new Error('요약 모델 한도(429): 등록한 ' + ks.length + '개 키의 모든 요약 모델이 지금은 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.'));
-          }
-          var keyInfo = ks[ki];
-
-          function attemptModel(mi) {
-            if (mi >= models.length) return attemptKey(ki + 1);
-            var model = models[mi];
-            setStatus(label + ' 중 · ' + prettyModel(model) + (ks.length > 1 ? ' · ' + keyInfo.num + '번 키' : ''), true, false);
-
-            function handle(res) {
-              noteRateLimit(keyInfo, res, prettyModel(model));
-              if (res.status === 429) {
-                if (mi + 1 < models.length) {
-                  addNotice("'" + prettyModel(model) + "' 모델 한도(429)에 걸려 '" + prettyModel(models[mi + 1]) + "' 모델로 전환합니다.");
-                }
-                return attemptModel(mi + 1);
-              }
-              if (!res.ok) {
-                return friendlyError(res, label).then(function (msg) { throw new Error(msg); });
-              }
-              return res.json().then(function (data) {
-                var choice = data && data.choices && data.choices[0];
-                var content = choice && choice.message && choice.message.content ? choice.message.content.trim() : '';
-                if (!content) throw new Error(label + ' 결과가 비어 있습니다. 잠시 후 다시 시도해 주세요.');
-                recordUsage(keyInfo.value, 'chat', 0);
-                if (ks.length > 1) noteKeySwitch(keyInfo);
-                return { text: content, model: model, keyNum: keyInfo.num };
-              });
-            }
-
-            return chatRequest(keyInfo.value, model, system, user).then(function (res) {
-              if (res.status === 429 && ks.length === 1) {
-                var wait = retryAfter(res);
-                if (wait > 0 && wait <= 20) {
-                  setStatus(label + ' 대기 ' + Math.ceil(wait) + '초 · ' + prettyModel(model), true, false);
-                  return sleep(wait * 1000).then(function () {
-                    return chatRequest(keyInfo.value, model, system, user).then(handle);
-                  });
-                }
-              }
-              return handle(res);
-            });
-          }
-          return attemptModel(0);
-        }
-        return attemptKey(0);
       }
 
       /* ---------- markdown ---------- */
@@ -2140,14 +2656,20 @@
         var badge = '<span class="badge ' + statusClass(it) + '"><span class="dot"></span>' + statusTextOf(it) + '</span>';
         var metaParts = [humanSize(it.size)];
         if (it.speed > 1.0001) metaParts.push(fmtSpeed(it.speed) + ' 배속');
+        if (it.splitMethod === 'copy') metaParts.push('미리 자르기');
+        else if (it.splitMethod === 'atempo') metaParts.push('배속(atempo)');
+        else if (it.splitMethod === 'reencode') metaParts.push('16kHz 재인코딩');
+        if (it.routeNote) metaParts.push(it.routeNote);
         if (it.splitTotal > 1) metaParts.push('분할 ' + it.splitTotal + '개');
         if (it.duration > 0) metaParts.push(fmtDur(it.duration));
         if (it.sttUsed) {
+          var keyTxt = '';
+          if (it.keysUsed && it.keysUsed.length > 1) keyTxt = ' (' + it.keysUsed.join('·') + '번 키)';
+          else if (it.keyNum && keys.length > 1) keyTxt = ' (' + it.keyNum + '번 키)';
           metaParts.push('받아쓰기 ' + STT[it.sttUsed].name + ' (' + STT[it.sttUsed].short + ')' +
-            (it.sttFallback ? ' 자동 전환' : '') +
-            (it.keyNum && keys.length > 1 ? ' (' + it.keyNum + '번 키)' : ''));
+            (it.sttFallback ? ' 자동 전환' : '') + keyTxt);
         }
-        if (it.chatUsed) metaParts.push('요약 ' + prettyModel(it.chatUsed) + (it.chatKeyNum && keys.length > 1 ? ' (' + it.chatKeyNum + '번 키)' : ''));
+        if (it.chatUsed) metaParts.push('정리 ' + prettyModel(it.chatUsed) + (it.chatKeyNum && keys.length > 1 ? ' (' + it.chatKeyNum + '번 키)' : ''));
 
         var head = document.createElement('button');
         head.type = 'button';
@@ -2395,7 +2917,7 @@
         it.notesBusy = true;
         saveCustom();
         setStatus('필기 정리 중 · ' + it.name, true, false);
-        askModel(keyOrder(), notesPrompt() + customDirective(), it.transcript, '필기 정리하는').then(function (res) {
+        askChat(notesPrompt() + customDirective(), it.transcript, '필기 정리하는').then(function (res) {
           it.notes = res.text;
           it.status = 'done';
           it.error = '';
@@ -2419,53 +2941,154 @@
           updateCard(it);
           return Promise.resolve();
         }
-        it.status = 'summarizing';
         it.tab = 'summary';
-        updateCard(it);
-        setStatus('정리 중 · ' + it.name, true, false);
-        return askModel(keyOrder(), summaryPrompt(mode) + customDirective(), text, '정리하는').then(function (res) {
+        return askChat(summaryPrompt(mode) + customDirective(), text, '정리하는').then(function (res) {
           it.summary = res.text;
           it.chatUsed = res.model;
           it.chatKeyNum = res.keyNum;
-          it.status = 'done';
           updateCard(it);
         });
       }
 
-      function processItem(it) {
+      /* 파일 하나의 전사: 원본 그대로 / ffmpeg로 잘라 가며 / 브라우저 디코딩 */
+      function transcribeItem(it) {
         it.error = '';
         it.sttFallback = false;
         it.sttUsed = '';
         it.chatUsed = '';
         it.keyNum = 0;
         it.chatKeyNum = 0;
+        it.keysUsed = [];
         it.splitTotal = 0;
         it.splitIndex = 0;
-        it.speed = 0;
+        it.splitMethod = '';
+        it.routeNote = '';
+        it.speed = speedValue;
         it.transcript = '';
         it.summary = '';
         it.notes = '';
         it.open = true;
 
-        var mode = modeChoice;
         var lang = langSelect.value;
-        var speed = speedValue;
-        it.speed = speed;
+        it.route = chooseRoute(it, it.speed);
+        updateCard(it);
 
-        /* 배속 1.0x + 25MB 이하 → 원본 그대로 1회 호출.
-           배속이 있거나 25MB를 넘으면 디코딩해서 (배속 →) 16kHz 모노 WAV로 만들어 보낸다. */
-        var textPromise = (it.big || speed > 1.0001)
-          ? transcribeSplit(keyOrder(), it, lang, speed)
-          : transcribe(keyOrder(), it, lang);
+        if (it.route === 'direct') {
+          it.status = 'transcribing';
+          updateCard(it);
+          return sttChunk(it, lang, { label: '받아쓰기' });
+        }
+        if (it.route === 'decode') return transcribeSplit(it, lang, it.speed);
+        return transcribeFfmpeg(it, lang, it.speed).catch(function (err) {
+          if (!err || !err.ffFallback) throw err;
+          it.route = 'decode';
+          it.routeNote = '브라우저 디코딩으로 대체';
+          it.splitTotal = 0;
+          it.splitIndex = 0;
+          addNotice(it.name + ': 미리 자르기(ffmpeg)를 쓰지 못해 브라우저 디코딩으로 처리합니다.');
+          renderRouteState();
+          return transcribeSplit(it, lang, it.speed);
+        });
+      }
 
-        return textPromise.then(function (text) {
-          return finishItem(it, mode, text);
-        }).catch(function (err) {
+      /* ---------- 실행: 전사 워커 → 정리 워커 파이프라인 ---------- */
+      function resetPipe() {
+        PIPE.sttQ = []; PIPE.chatQ = [];
+        PIPE.sttRun = 0; PIPE.chatRun = 0;
+        PIPE.busy = {}; PIPE.cool = {};
+        PIPE.sttDone = 0; PIPE.chatDone = 0;
+        PIPE.sttBytes = 0; PIPE.sttMs = 0; PIPE.chatItems = 0; PIPE.chatMs = 0;
+        PIPE.startedMs = nowMs();
+      }
+      function pumpPipeline() {
+        var chatCap = Math.max(1, rolePool('chat').length);
+        var sttCap = Math.max(1, rolePool('stt').length);
+        /* 정리를 먼저 띄우고, 대기 중인 정리가 있으면 전사는 키 하나를 정리에 남겨 둔다. */
+        while (PIPE.chatRun < chatCap && PIPE.chatQ.length) startChatJob(PIPE.chatQ.shift());
+        var sttLimit = Math.min(sttCap, keys.length);
+        if (PIPE.chatQ.length && sttLimit > 1) sttLimit -= 1;
+        if (sttLimit < 1) sttLimit = 1;
+        while (PIPE.sttRun < sttLimit && PIPE.sttQ.length) startSttJob(PIPE.sttQ.shift());
+        checkRunDone();
+      }
+      function startSttJob(it) {
+        PIPE.sttRun += 1;
+        it.startedAt = nowMs();
+        setStatus('(' + (PIPE.sttDone + 1) + '/' + (PIPE.sttDone + PIPE.sttRun + PIPE.sttQ.length) + ') ' + it.name, true, false);
+        updateProgressBar();
+        transcribeItem(it).then(function (text) {
+          it.sttMs = Math.max(0, nowMs() - it.startedAt);
+          it.runMs = it.sttMs;
+          it.transcript = text || '';
+          PIPE.sttRun -= 1;
+          PIPE.sttDone += 1;
+          PIPE.sttBytes += it.size || 0;
+          PIPE.sttMs += it.sttMs;
+          if (it.runMode === 'raw') {
+            it.status = 'done';
+            it.tab = 'transcript';
+            updateCard(it);
+            updateProgressBar();
+            pumpPipeline();
+            return;
+          }
+          /* 전사가 끝나면 바로 정리 큐로 넘겨 다음 파일 전사와 겹쳐 돌린다. */
+          it.status = 'queued';
+          updateCard(it);
+          PIPE.chatQ.push(it);
+          updateProgressBar();
+          pumpPipeline();
+        }, function (err) {
+          PIPE.sttRun -= 1;
           it.status = 'error';
-          it.error = err.message;
+          it.error = err && err.message ? err.message : String(err);
           if (it.transcript) it.tab = 'transcript';
           updateCard(it);
+          updateProgressBar();
+          pumpPipeline();
         });
+      }
+      function startChatJob(it) {
+        PIPE.chatRun += 1;
+        it.status = 'summarizing';
+        it.tab = 'summary';
+        it.chatStartedAt = nowMs();
+        updateCard(it);
+        updateProgressBar();
+        function after() {
+          PIPE.chatRun -= 1;
+          PIPE.chatDone += 1;
+          PIPE.chatItems += 1;
+          PIPE.chatMs += Math.max(0, nowMs() - it.chatStartedAt);
+          updateCard(it);
+          updateProgressBar();
+          pumpPipeline();
+        }
+        finishItem(it, it.runMode, it.transcript).then(function () {
+          it.status = 'done';
+          after();
+        }, function (err) {
+          it.status = 'error';
+          it.error = err && err.message ? err.message : String(err);
+          after();
+        });
+      }
+      function checkRunDone() {
+        if (!busy) return;
+        if (PIPE.sttQ.length || PIPE.chatQ.length || PIPE.sttRun || PIPE.chatRun) return;
+        busy = false;
+        var ok = 0, err = 0;
+        runState.queue.forEach(function (it) {
+          if (it.status === 'done') ok += 1; else err += 1;
+        });
+        updateProgressBar();
+        updateRunButton();
+        var parts = [runState.total + '개 중 ' + ok + '개 완료'];
+        if (err) parts.push(err + '개 오류');
+        setStatus(parts.join(' · '), false, err > 0);
+        if (ok) showToast(ok + '개 파일 정리 완료');
+        runState = { total: 0, queue: [], startedMs: 0 };
+        updateProgressBar();
       }
 
       function runAll() {
@@ -2476,44 +3099,24 @@
         busy = true;
         hideNotice();
         saveCustom();
-        runState = { total: queue.length, queue: queue };
-        queue.forEach(function (it) { it.runMs = 0; it.startedAt = 0; });
-        updateRunButton();
-        updateProgressBar();
-
-        var index = 0;
-        var okCount = 0, skipCount = 0, errCount = 0;
+        resetPipe();
+        PIPE.total = queue.length;
+        runState = { total: queue.length, queue: queue, startedMs: PIPE.startedMs };
+        var mode = modeChoice;
+        queue.forEach(function (it) {
+          it.runMs = 0;
+          it.startedAt = 0;
+          it.runMode = mode;
+          it.open = true;
+          it.error = '';
+          it.status = 'pending';
+          PIPE.sttQ.push(it);
+        });
         items.forEach(function (it) { if (queue.indexOf(it) !== -1) it.open = true; });
         renderResults();
-
-        function next() {
-          if (index >= queue.length) {
-            busy = false;
-            runState = { total: 0, queue: [] };
-            updateProgressBar();
-            updateRunButton();
-            var parts = [queue.length + '개 중 ' + okCount + '개 완료'];
-            if (skipCount) parts.push(skipCount + '개 건너뜀');
-            if (errCount) parts.push(errCount + '개 오류');
-            setStatus(parts.join(' · '), false, errCount > 0);
-            if (okCount) showToast(okCount + '개 파일 정리 완료');
-            return;
-          }
-          var it = queue[index];
-          index += 1;
-          it.startedAt = nowMs();
-          updateProgressBar();
-          setStatus('(' + index + '/' + queue.length + ') ' + it.name, true, false);
-          processItem(it).then(function () {
-            if (it.startedAt) { it.runMs = Math.max(0, nowMs() - it.startedAt); it.startedAt = 0; }
-            if (it.status === 'done') okCount += 1;
-            else if (it.status === 'skipped') skipCount += 1;
-            else errCount += 1;
-            updateProgressBar();
-            return next();
-          });
-        }
-        next();
+        updateRunButton();
+        updateProgressBar();
+        pumpPipeline();
       }
       runBtn.addEventListener('click', runAll);
 
@@ -2524,6 +3127,7 @@
       settingsPinned = savedSettings !== null;
       setSettings(savedSettings === null ? keys.length === 0 : savedSettings === '1', false);
       renderKeys();
+      renderRouteState();
       renderFileList();
       renderResults();
       updateRunButton();
