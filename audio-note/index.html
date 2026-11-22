@@ -2969,7 +2969,7 @@
         return transcribeFfmpeg(it, lang, it.speed, ki).catch(function (err) {
           if (!err || !err.ffFallback) throw err;
           it.route = 'decode';
-          it.routeNote = '브라우저 디코딩으로 대체';
+          it.routeNote = 'DBG ' + (err && err.message ? String(err.message).slice(0, 60) : '?') + ' || ' + ffState.logs.slice(-5).join(' | ').slice(0, 220);
           it.splitTotal = 0;
           it.splitIndex = 0;
           addNotice(it.name + ': 미리 자르기(ffmpeg)를 쓰지 못해 브라우저 디코딩으로 처리합니다.');
