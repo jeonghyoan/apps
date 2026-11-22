@@ -20,6 +20,7 @@ Free audio transcription & summaries via Groq free API (PWA).
 - Turns each transcript into one "notes" tab next to the transcript: general notes, meeting notes or class notes. Long transcripts are summarized section by section and the sections are joined as they are (no lossy re-compression), and anything misheard or unclear is collected once at the end under "다시 들어볼 구간" with its timestamp.
 - Multiple API keys can be added. A per-minute 429 keeps the selected model, retrying on another key or after a short wait before it falls back to the lighter model. Keys stay in the browser's `localStorage` and go only to the Groq API.
 - Works offline as an installed app shell, in light or dark mode.
+- The screen keeps only labels and controls: every explanation sits behind a small monochrome ⓘ button that opens a glass (frosted, translucent) popover, closed by tapping outside, `Esc` or ×.
 
 Open: https://jeonghyoan.github.io/apps/audio-note/
 

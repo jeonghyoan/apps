@@ -111,8 +111,6 @@
       display: grid; place-items: center; border: 1px solid var(--accent-line);
     }
     h1 { margin: 0; font-size: 16px; font-weight: 680; letter-spacing: -0.015em; white-space: nowrap; }
-    .brand-sub { margin: 2px 0 0; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    @media (max-width: 430px) { .brand-sub { display: none; } }
 
     .top-actions { display: flex; align-items: center; gap: 6px; flex: none; }
     .icon-btn {
@@ -217,14 +215,12 @@
     .input:focus, .select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); background: var(--surface); }
     .input.mono { font-family: var(--mono); font-size: 13px; letter-spacing: 0.01em; }
     .field-label { display: block; font-size: 11.5px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
-    .note { margin: 9px 0 0; font-size: 11.5px; line-height: 1.55; color: var(--muted); }
-    .note code { font-family: var(--mono); font-size: 11px; }
     .select-wrap { position: relative; }
     .select { appearance: none; -webkit-appearance: none; padding-right: 34px; cursor: pointer; }
     .select-wrap .chev { position: absolute; right: 11px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     @media (max-width: 400px) { .grid-2 { grid-template-columns: 1fr; } }
-    .label-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+    .label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .label-row .link-btn { padding: 0; font-size: 11px; }
     .link-btn {
       border: 0; background: transparent; color: var(--muted); font-family: inherit;
@@ -233,8 +229,7 @@
     }
     .link-btn:hover { color: var(--text); }
     .custom-area { min-height: 78px; line-height: 1.6; resize: vertical; font-size: 13px; }
-    .hint-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-top: 7px; }
-    .hint-row .note { margin: 0; }
+    .hint-row { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 7px; }
     .hint-row .chip { flex: none; font-family: var(--mono); font-size: 10.5px; }
 
     /* segmented control */
@@ -511,7 +506,79 @@
     .rmsg { margin-top: 9px; font-size: 12px; line-height: 1.55; color: var(--danger); }
     .rmsg.warn { color: var(--warn); }
 
-    .foot { margin: 18px 0 0; font-size: 11.5px; line-height: 1.6; color: var(--muted); text-align: center; }
+    .foot { margin: 16px 0 0; display: flex; justify-content: center; }
+    .foot-info {
+      display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px;
+      border: 0; border-radius: 999px; background: transparent; color: var(--faint);
+      font-family: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer;
+      transition: color 0.15s ease, background-color 0.15s ease;
+    }
+    .foot-info:hover { color: var(--muted); background: var(--surface-2); }
+    body.dark .foot-info:hover { background: var(--surface-3); }
+    .foot-info .ic { width: 14px; height: 14px; stroke-width: 1.5; }
+
+    /* ---------- ⓘ info button + glass popover ---------- */
+    .info-btn {
+      position: relative; display: inline-grid; place-items: center; flex: none;
+      width: 26px; height: 26px; margin: -2px; padding: 0;
+      border: 0; border-radius: 50%; background: transparent; color: var(--faint);
+      cursor: pointer; transition: color 0.15s ease, background-color 0.15s ease;
+    }
+    .info-btn::after { content: ""; position: absolute; inset: -5px; border-radius: 50%; }
+    .info-btn .ic { width: 16px; height: 16px; stroke-width: 1.5; }
+    .info-btn:hover { color: var(--muted); background: var(--surface-2); }
+    body.dark .info-btn:hover { background: var(--surface-3); }
+    .info-btn[aria-expanded="true"] { color: var(--accent-ink); }
+    .pane-title .info-btn, .card-title .info-btn { width: 22px; height: 22px; }
+    .pane-title .info-btn .ic, .card-title .info-btn .ic { width: 15px; height: 15px; }
+    .label-line { display: flex; align-items: center; gap: 2px; min-width: 0; }
+    .label-line .field-label { margin-bottom: 0; }
+
+    .info-layer { position: fixed; inset: 0; z-index: 80; }
+    .info-backdrop {
+      position: absolute; inset: 0; background: rgba(15, 18, 24, 0.16);
+      -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+      opacity: 0; transition: opacity 0.18s ease;
+    }
+    body.dark .info-backdrop { background: rgba(0, 0, 0, 0.34); }
+    .info-pop {
+      position: absolute; top: 0; left: 0;
+      width: min(380px, calc(100vw - 24px)); max-height: min(68vh, 460px);
+      display: flex; flex-direction: column; padding: 13px 14px 14px;
+      border-radius: 18px; outline: none;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      background: rgba(255, 255, 255, 0.68);
+      -webkit-backdrop-filter: blur(20px) saturate(160%);
+      backdrop-filter: blur(20px) saturate(160%);
+      box-shadow: 0 24px 60px -22px rgba(16, 24, 40, 0.42), 0 2px 10px rgba(16, 24, 40, 0.08);
+      opacity: 0; transform: translateY(-6px) scale(0.97);
+      transition: opacity 0.16s ease, transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+      will-change: transform, opacity;
+    }
+    body.dark .info-pop {
+      border-color: rgba(255, 255, 255, 0.12);
+      background: rgba(22, 26, 34, 0.68);
+      box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.8), 0 2px 10px rgba(0, 0, 0, 0.5);
+    }
+    .info-layer.in .info-backdrop { opacity: 1; }
+    .info-layer.in .info-pop { opacity: 1; transform: none; }
+    .info-head { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+    .info-title { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 680; letter-spacing: -0.01em; color: var(--text); }
+    .info-close {
+      flex: none; width: 26px; height: 26px; display: grid; place-items: center;
+      margin: -4px -5px -4px 0; padding: 0 0 2px;
+      border: 0; border-radius: 50%; background: transparent;
+      color: var(--muted); font-family: inherit; font-size: 19px; line-height: 1; cursor: pointer;
+    }
+    .info-close:hover { color: var(--text); background: rgba(127, 127, 127, 0.16); }
+    .info-body { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+    .info-body > div { display: grid; gap: 8px; }
+    .info-body p { margin: 0; font-size: 12px; line-height: 1.68; color: var(--text); opacity: 0.88; }
+    .info-body code {
+      font-family: var(--mono); font-size: 11px; padding: 1px 4px; border-radius: 5px;
+      background: rgba(127, 127, 127, 0.16);
+    }
+    .info-body strong { font-weight: 680; opacity: 1; }
 
     /* ---------- toast ---------- */
     .toast {
@@ -551,7 +618,6 @@
         </span>
         <div>
           <h1>오디오 녹음 정리기</h1>
-          <p class="brand-sub">받아쓰기 · 정리 노트를 한 번에</p>
         </div>
       </div>
       <div class="top-actions">
@@ -617,6 +683,9 @@
                       <path d="M4 15.5h6M4 19h10"></path>
                     </svg>
                     Groq API 키
+                    <button class="info-btn" type="button" data-info="keys" aria-label="Groq API 키 설명" aria-expanded="false">
+                      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 11v5"></path><path d="M12 8h.01"></path></svg>
+                    </button>
                   </h2>
                   <span class="chip" id="keyCountChip">0개 등록</span>
                 </div>
@@ -628,10 +697,6 @@
                   </button>
                 </div>
                 <ul class="key-list" id="keyList"></ul>
-                <p class="note">모든 키는 이 기기 브라우저의 localStorage에만 저장되고, 화면에는 끝 4자리만 보이도록 마스킹됩니다. 요청은 <code>api.groq.com</code>으로만 나갑니다.</p>
-                <p class="note">키를 2개 이상 넣으면 파일을 키 수만큼 나눠 동시에 전사하고, 파일 하나가 여러 조각이면 그 조각들도 키들이 나눠 동시에 올립니다. 전사가 모두 끝나면 정리를 다시 나눠 병렬로 처리합니다.</p>
-                <p class="note">같은 Groq 계정의 키들은 한도를 공유하며, 다른 계정 키를 넣으면 한도 초과 시 자동 전환됩니다.</p>
-                <p class="note">정리 중 분당 한도(429)에 걸리면 모델을 바로 내리지 않고, 다른 키로 같은 모델을 먼저 시도하고 모든 키가 한도면 잠시 대기(한도 회복 중)한 뒤 같은 모델로 다시 시도합니다. 그래도 안 되면 그때 가벼운 모델로 전환합니다.</p>
               </div>
 
               <div class="pane">
@@ -642,6 +707,9 @@
                     <path d="M12 4v2M12 18v2M4 12h2M18 12h2"></path>
                   </svg>
                   받아쓰기 모델
+                  <button class="info-btn" type="button" data-info="stt" aria-label="받아쓰기 모델 설명" aria-expanded="false">
+                    <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 11v5"></path><path d="M12 8h.01"></path></svg>
+                  </button>
                 </h2>
                 <div class="seg seg-stt" id="sttSeg" role="group" aria-label="받아쓰기 모델 선택">
                   <button class="seg-btn active" type="button" data-stt="turbo" aria-pressed="true">
@@ -653,16 +721,24 @@
                     <span class="seg-sub">whisper-large-v3</span>
                   </button>
                 </div>
-                <p class="note">선택한 모델이 한도(429)에 걸리면 파일마다 다른 모델로 자동 전환해 이어서 받아쓰고, 해당 카드에 표시합니다.</p>
 
                 <div class="label-row" style="margin-top:13px">
-                  <label class="field-label">대용량 처리 방식</label>
+                  <span class="label-line">
+                    <label class="field-label">대용량 처리 방식</label>
+                    <button class="info-btn" type="button" data-info="route" aria-label="대용량 처리 방식 설명" aria-expanded="false">
+                      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 11v5"></path><path d="M12 8h.01"></path></svg>
+                    </button>
+                  </span>
                   <span class="chip" id="routeChip">미리 자르기</span>
                 </div>
-                <p class="note" id="routeNote">25MB를 넘으면 통째로 디코딩하지 않고 10분 조각으로 잘라 조각만 메모리에 올립니다. 첫 파일에서 ffmpeg(약 32MB)를 한 번만 내려받습니다.</p>
 
                 <div style="height:12px"></div>
-                <label class="field-label" for="chatModel">정리 모델</label>
+                <div class="label-line" style="margin-bottom:6px">
+                  <label class="field-label" for="chatModel">정리 모델</label>
+                  <button class="info-btn" type="button" data-info="chat" aria-label="정리 모델 설명" aria-expanded="false">
+                    <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 11v5"></path><path d="M12 8h.01"></path></svg>
+                  </button>
+                </div>
                 <div class="select-wrap">
                   <select class="select" id="chatModel">
                     <option value="openai/gpt-oss-120b">GPT-OSS 120B · 기본</option>
@@ -671,8 +747,6 @@
                   </select>
                   <svg class="ic ic-sm chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9.5l6 6 6-6"></path></svg>
                 </div>
-                <p class="note">전사가 길면(3,500자 초과) 한 번에 보내지 않고 3,200자 안팎으로 나눠 구간별로 정리한 뒤, 다시 압축하지 않고 순서대로 이어 붙여 내용이 빠지지 않게 합니다. 카드에 "정리 중 (2/4)"처럼 진행이 표시됩니다.</p>
-                <p class="note">받아쓰기에는 <code>[MM:SS]</code> 타임스탬프가 붙고, 정리 노트 끝에는 문맥상 불확실한 단어만 모은 <strong>다시 들어볼 구간</strong>이 붙습니다.</p>
 
                 <div class="grid-2" style="margin-top:12px">
                   <div>
@@ -702,12 +776,16 @@
 
                 <div style="height:13px"></div>
                 <div class="label-row">
-                  <label class="field-label" for="customPrompt">정리 지침 (선택)</label>
+                  <span class="label-line">
+                    <label class="field-label" for="customPrompt">정리 지침 (선택)</label>
+                    <button class="info-btn" type="button" data-info="custom" aria-label="정리 지침 설명" aria-expanded="false">
+                      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 11v5"></path><path d="M12 8h.01"></path></svg>
+                    </button>
+                  </span>
                   <button class="link-btn" id="customClearBtn" type="button" hidden>초기화</button>
                 </div>
                 <textarea class="input custom-area" id="customPrompt" rows="3" maxlength="1000" placeholder="예: 코드와 명령어는 코드블록으로, 시험에 나올 부분은 굵게 강조" aria-describedby="customNote"></textarea>
                 <div class="hint-row">
-                  <p class="note" id="customNote">프리셋에 더해 정리 지침으로 전달되고, 이 기기에 자동 저장됩니다.</p>
                   <span class="chip" id="customCount">0/1000</span>
                 </div>
               </div>
@@ -725,6 +803,9 @@
               <path d="M5 16.5v1.5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1.5"></path>
             </svg>
             녹음 파일
+            <button class="info-btn" type="button" data-info="files" aria-label="녹음 파일 안내" aria-expanded="false">
+              <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 11v5"></path><path d="M12 8h.01"></path></svg>
+            </button>
           </h2>
           <span class="chip" id="fileCountChip">0개 선택</span>
         </div>
@@ -738,9 +819,7 @@
             </svg>
           </span>
           <span class="drop-title">오디오 파일 선택</span>
-          <span class="drop-meta">여러 개를 한 번에 · 끌어다 놓아도 됩니다</span>
-          <span class="drop-meta">m4a, mp3, wav, ogg, webm, flac</span>
-          <span class="drop-meta">3시간 넘는 긴 녹음도 자동으로 잘라 처리합니다</span>
+          <span class="drop-meta">m4a · mp3 · wav · ogg · webm · flac</span>
         </div>
         <input type="file" id="fileInput" accept="audio/*" multiple hidden />
 
@@ -833,10 +912,55 @@
       </section>
     </div>
 
-    <p class="foot">
-      오디오와 API 키는 Groq로만 전송되며, 이 페이지는 어떤 서버에도 저장하지 않습니다.<br />
-      결과는 기기에만 남습니다.
-    </p>
+    <div class="foot">
+      <button class="foot-info" type="button" data-info="privacy" aria-expanded="false">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 11v5"></path><path d="M12 8h.01"></path></svg>
+        <span>개인정보</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ⓘ 설명 원문: 팝오버로만 표시된다(v7까지 화면에 줄글로 깔려 있던 안내). -->
+  <div id="infoStore" hidden>
+    <div data-info-body="keys" data-title="Groq API 키">
+      <p>모든 키는 이 기기 브라우저의 localStorage에만 저장되고, 화면에는 끝 4자리만 보이도록 마스킹됩니다. 요청은 <code>api.groq.com</code>으로만 나갑니다.</p>
+      <p>키를 2개 이상 넣으면 파일을 키 수만큼 나눠 동시에 전사하고, 파일 하나가 여러 조각이면 그 조각들도 키들이 나눠 동시에 올립니다. 전사가 모두 끝나면 정리를 다시 나눠 병렬로 처리합니다.</p>
+      <p>같은 Groq 계정의 키들은 한도를 공유하며, 다른 계정 키를 넣으면 한도 초과 시 자동 전환됩니다.</p>
+      <p>정리 중 분당 한도(429)에 걸리면 모델을 바로 내리지 않고, 다른 키로 같은 모델을 먼저 시도하고 모든 키가 한도면 잠시 대기(한도 회복 중)한 뒤 같은 모델로 다시 시도합니다. 그래도 안 되면 그때 가벼운 모델로 전환합니다.</p>
+    </div>
+    <div data-info-body="stt" data-title="받아쓰기 모델">
+      <p>선택한 모델이 한도(429)에 걸리면 파일마다 다른 모델로 자동 전환해 이어서 받아쓰고, 해당 카드에 표시합니다.</p>
+    </div>
+    <div data-info-body="route" data-title="대용량 처리 방식">
+      <p id="routeNote">25MB를 넘으면 통째로 디코딩하지 않고 10분 조각으로 잘라 조각만 메모리에 올립니다. 첫 파일에서 ffmpeg(약 32MB)를 한 번만 내려받습니다.</p>
+    </div>
+    <div data-info-body="chat" data-title="정리 모델">
+      <p>전사가 길면(3,500자 초과) 한 번에 보내지 않고 3,200자 안팎으로 나눠 구간별로 정리한 뒤, 다시 압축하지 않고 순서대로 이어 붙여 내용이 빠지지 않게 합니다. 카드에 "정리 중 (2/4)"처럼 진행이 표시됩니다.</p>
+      <p>받아쓰기에는 <code>[MM:SS]</code> 타임스탬프가 붙고, 정리 노트 끝에는 문맥상 불확실한 단어만 모은 <strong>다시 들어볼 구간</strong>이 붙습니다.</p>
+    </div>
+    <div data-info-body="custom" data-title="정리 지침">
+      <p id="customNote">프리셋에 더해 정리 지침으로 전달되고, 이 기기에 자동 저장됩니다.</p>
+    </div>
+    <div data-info-body="files" data-title="녹음 파일">
+      <p>여러 개를 한 번에 고르거나 끌어다 놓아도 됩니다.</p>
+      <p>3시간이 넘는 긴 녹음도 자동으로 잘라 처리합니다.</p>
+      <p>지원 형식: m4a, mp3, wav, ogg, webm, flac.</p>
+    </div>
+    <div data-info-body="privacy" data-title="저장·전송 안내">
+      <p>오디오와 API 키는 Groq로만 전송되며, 이 페이지는 어떤 서버에도 저장하지 않습니다.</p>
+      <p>결과는 기기에만 남습니다.</p>
+    </div>
+  </div>
+
+  <div class="info-layer" id="infoLayer" hidden>
+    <div class="info-backdrop" id="infoBackdrop"></div>
+    <div class="info-pop" id="infoPop" role="dialog" aria-modal="false" aria-labelledby="infoTitle" tabindex="-1">
+      <div class="info-head">
+        <span class="info-title" id="infoTitle"></span>
+        <button class="info-close" id="infoClose" type="button" aria-label="닫기">&times;</button>
+      </div>
+      <div class="info-body" id="infoBody"></div>
+    </div>
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite">
@@ -951,6 +1075,82 @@
       if (settingsToggle) settingsToggle.addEventListener('click', function () { setSettings(!settingsOpen, true); });
       if (settingsBtn) settingsBtn.addEventListener('click', function () { setSettings(!settingsOpen, true); });
       if (quotaChip) quotaChip.addEventListener('click', revealSettings);
+
+      /* ---------- ⓘ 설명 팝오버(글래시모피즘) ---------- */
+      var infoLayer = $('infoLayer'), infoBackdrop = $('infoBackdrop'), infoPop = $('infoPop');
+      var infoTitle = $('infoTitle'), infoClose = $('infoClose'), infoBody = $('infoBody');
+      var infoStore = $('infoStore');
+      var infoCurrent = null, infoHideTimer = 0;
+
+      function placeInfo(btn) {
+        var pad = 10;
+        var r = btn.getBoundingClientRect();
+        var pw = infoPop.offsetWidth, ph = infoPop.offsetHeight;
+        var vw = window.innerWidth || document.documentElement.clientWidth;
+        var vh = window.innerHeight || document.documentElement.clientHeight;
+        var left = r.left + r.width / 2 - pw / 2;
+        left = Math.max(pad, Math.min(left, vw - pw - pad));
+        var top = r.bottom + 9;
+        if (top + ph > vh - pad) {
+          var above = r.top - ph - 9;
+          top = above >= pad ? above : Math.max(pad, (vh - ph) / 2);
+        }
+        infoPop.style.left = Math.round(left) + 'px';
+        infoPop.style.top = Math.round(top) + 'px';
+      }
+
+      function closeInfo(restoreFocus) {
+        if (!infoCurrent) return;
+        var cur = infoCurrent;
+        infoCurrent = null;
+        infoLayer.classList.remove('in');
+        if (cur.parent && infoBody.contains(cur.node)) cur.parent.insertBefore(cur.node, cur.next);
+        cur.btn.setAttribute('aria-expanded', 'false');
+        if (infoHideTimer) clearTimeout(infoHideTimer);
+        infoHideTimer = setTimeout(function () {
+          infoHideTimer = 0;
+          if (!infoCurrent) infoLayer.hidden = true;
+        }, 180);
+        if (restoreFocus) { try { cur.btn.focus({ preventScroll: true }); } catch (e) { cur.btn.focus(); } }
+      }
+
+      function openInfo(btn) {
+        var key = btn.getAttribute('data-info');
+        var node = infoStore.querySelector('[data-info-body="' + key + '"]');
+        if (!node) return;
+        if (infoCurrent) closeInfo(false);
+        if (infoHideTimer) { clearTimeout(infoHideTimer); infoHideTimer = 0; }
+        infoCurrent = { btn: btn, node: node, parent: node.parentNode, next: node.nextSibling };
+        infoTitle.textContent = node.getAttribute('data-title') || '';
+        infoBody.appendChild(node);
+        infoBody.scrollTop = 0;
+        infoLayer.hidden = false;
+        btn.setAttribute('aria-expanded', 'true');
+        placeInfo(btn);
+        void infoPop.offsetWidth;
+        infoLayer.classList.add('in');
+        try { infoPop.focus({ preventScroll: true }); } catch (e) { infoPop.focus(); }
+        requestAnimationFrame(function () { if (infoCurrent && infoCurrent.btn === btn) placeInfo(btn); });
+      }
+
+      function toggleInfo(btn) {
+        if (infoCurrent && infoCurrent.btn === btn) closeInfo(true);
+        else openInfo(btn);
+      }
+
+      document.addEventListener('click', function (e) {
+        var t = e.target;
+        var btn = t && t.closest ? t.closest('button[data-info]') : null;
+        if (btn) { e.preventDefault(); toggleInfo(btn); return; }
+        if (infoCurrent && !infoPop.contains(t)) closeInfo(true);
+      }, true);
+      if (infoClose) infoClose.addEventListener('click', function () { closeInfo(true); });
+      document.addEventListener('keydown', function (e) {
+        if (!infoCurrent) return;
+        if (e.key === 'Escape' || e.key === 'Esc') { e.preventDefault(); closeInfo(true); }
+      });
+      window.addEventListener('scroll', function () { if (infoCurrent) placeInfo(infoCurrent.btn); }, { passive: true });
+      window.addEventListener('resize', function () { if (infoCurrent) placeInfo(infoCurrent.btn); });
 
       /* ---------- quota / local usage ---------- */
       function fmtNum(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
@@ -3027,7 +3227,7 @@
           empty.className = 'empty-results';
           empty.innerHTML =
             '<svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 11h14M5 16h9"></path></svg>' +
-            '<span>오디오 파일을 고르면 파일마다 카드가 생기고,<br />받아쓰기 · 정리 노트가 카드 안에 쌓입니다.</span>';
+            '<span>파일을 고르면 여기에 카드가 쌓입니다.</span>';
           resultList.appendChild(empty);
           updateRunButton();
           updateProgressBar();
