@@ -16,7 +16,7 @@ Live: https://jeonghyoan.github.io/apps/
 Free audio transcription & summaries via Groq free API (PWA).
 
 - Transcribes several recordings at once with Groq Whisper (`whisper-large-v3-turbo` by default, `whisper-large-v3` for accuracy).
-- Every transcript line carries a `[MM:SS]` timestamp from Whisper's segment data, so a note can be checked against the recording.
+- Every transcript line carries a `[MM:SS]` timestamp from Whisper's segment data, so a note can be checked against the recording. A `시간` toggle in the transcript card's action bar hides or shows those timestamps, and copy, TXT and MD follow the current state.
 - Turns each transcript into one "notes" tab next to the transcript: general notes, meeting notes or class notes. Long transcripts are summarized section by section and the sections are joined as they are (no lossy re-compression), and anything misheard or unclear is collected once at the end under "다시 들어볼 구간" with its timestamp.
 - Multiple API keys can be added. A per-minute 429 keeps the selected model, retrying on another key or after a short wait before it falls back to the lighter model. Keys stay in the browser's `localStorage` and go only to the Groq API.
 - Works offline as an installed app shell, in light or dark mode.

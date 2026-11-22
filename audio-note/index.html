@@ -475,6 +475,9 @@
     .tab-num { font-size: 10px; color: var(--faint); font-family: var(--mono); }
     .racc { display: flex; gap: 5px; flex-wrap: wrap; }
     .racc .btn { padding: 6px 9px; font-size: 11.5px; min-height: 32px; }
+    /* 받아쓰기 탭의 '시간' 토글: 켜져 있으면 강조색 */
+    .racc .btn[aria-pressed="true"] { color: var(--accent-ink); border-color: var(--accent-line); background: var(--accent-soft); }
+    .racc .btn[aria-pressed="true"] .ic { color: var(--accent-ink); }
     .output {
       margin-top: 9px; padding: 12px;
       background: var(--surface); border: 1px solid var(--line); border-radius: 11px;
@@ -949,6 +952,7 @@
     <div data-info-body="chat" data-title="정리 모델">
       <p>전사가 길면(3,500자 초과) 3,200자 안팎으로 나눠 구간별로 정리한 뒤, 다시 압축하지 않고 순서대로 이어 붙입니다. 카드에 "정리 중 (2/4)"처럼 진행이 표시됩니다.</p>
       <p>받아쓰기에는 <code>[MM:SS]</code> 타임스탬프가 붙고, 정리 노트 끝에는 문맥상 불확실한 단어만 모은 <strong>다시 들어볼 구간</strong>이 붙습니다.</p>
+      <p>받아쓰기 카드의 <strong>시간</strong> 버튼으로 줄 앞 시각을 켜고 끌 수 있습니다. 복사·TXT·MD도 지금 상태 그대로 저장됩니다.</p>
     </div>
     <div data-info-body="custom" data-title="정리 지침">
       <p id="customNote">프리셋에 더해 정리 지침으로 전달되고, 이 기기에 자동 저장됩니다.</p>
@@ -1019,7 +1023,8 @@
         custom: 'audio_note_custom_prompt',
         settings: 'audio_note_settings_open',
         quota: 'audio_note_quota',
-        usage: 'audio_note_usage'
+        usage: 'audio_note_usage',
+        stamps: 'audio_note_show_stamps'
       };
 
       var $ = function (id) { return document.getElementById(id); };
@@ -3124,8 +3129,21 @@
       function noteOf(it) {
         return it.note || it.summary || it.notes || '';
       }
+      /* 받아쓰기 줄 앞의 [MM:SS]·[H:MM:SS] 토글. 기본 켜짐, 이 기기에 저장. */
+      var showStamps = read(LS.stamps) !== '0';
+      var STAMP_HEAD = /^\[(?:\d+:)?\d{2}:\d{2}\]\s*/;
+      function stampStrip(text) {
+        return String(text || '')
+          .split('\n')
+          .map(function (line) { return line.replace(STAMP_HEAD, ''); })
+          .join('\n');
+      }
+      function transcriptText(it) {
+        var t = it.transcript || '';
+        return showStamps ? t : stampStrip(t);
+      }
       function itemText(it) {
-        if (tabKeyOf(it) === 'transcript') return it.transcript || '';
+        if (tabKeyOf(it) === 'transcript') return transcriptText(it);
         return noteOf(it);
       }
 
@@ -3208,6 +3226,16 @@
           '<button class="btn" type="button" data-act="copy"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2.5"></rect><path d="M5.5 15V6.5a2 2 0 0 1 2-2H15"></path></svg><span>복사</span></button>' +
           '<button class="btn" type="button" data-act="txt"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"></path><path d="M7.5 10.5L12 15l4.5-4.5"></path><path d="M5 19.5h14"></path></svg>TXT</button>' +
           '<button class="btn" type="button" data-act="md"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"></path><path d="M7.5 10.5L12 15l4.5-4.5"></path><path d="M5 19.5h14"></path></svg>MD</button>';
+        if (tabKeyOf(it) === 'transcript') {
+          var tsBtn = document.createElement('button');
+          tsBtn.type = 'button';
+          tsBtn.className = 'btn';
+          tsBtn.setAttribute('data-act', 'stamps');
+          tsBtn.setAttribute('aria-pressed', showStamps ? 'true' : 'false');
+          tsBtn.title = showStamps ? '줄 앞 시각을 숨기기' : '줄 앞 시각을 보이기';
+          tsBtn.innerHTML = '<svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.2"></circle><path d="M12 7.6V12l3 1.8"></path></svg><span>시간</span>';
+          acc.insertBefore(tsBtn, acc.firstChild);
+        }
         bar.appendChild(acc);
         body.appendChild(bar);
 
@@ -3279,6 +3307,13 @@
         if (act === 'tab') {
           it.tab = el.getAttribute('data-tab');
           updateCard(it);
+          return;
+        }
+        if (act === 'stamps') {
+          showStamps = !showStamps;
+          write(LS.stamps, showStamps ? '1' : '0');
+          updateCard(it);
+          showToast(showStamps ? '줄 앞 시간 표시' : '줄 앞 시간 숨김');
           return;
         }
         if (act === 'copy') {
@@ -3359,7 +3394,7 @@
             if (it.chatUsed) out.push('- 정리 모델: ' + prettyModel(it.chatUsed));
             out.push('');
             if (noteOf(it)) { out.push('### 정리 노트', '', noteOf(it), ''); }
-            if (it.transcript) { out.push('### 받아쓰기', '', it.transcript, ''); }
+            if (it.transcript) { out.push('### 받아쓰기', '', transcriptText(it), ''); }
           });
           return out.join('\n');
         }
@@ -3370,7 +3405,7 @@
           if (it.chatUsed) out.push('정리 모델: ' + prettyModel(it.chatUsed));
           out.push('');
           if (noteOf(it)) { out.push('[정리 노트]', noteOf(it), ''); }
-          if (it.transcript) { out.push('[받아쓰기]', it.transcript, ''); }
+          if (it.transcript) { out.push('[받아쓰기]', transcriptText(it), ''); }
         });
         return toPlain(out.join('\n'));
       }
