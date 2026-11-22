@@ -1,4 +1,4 @@
-const CACHE = 'audio-note-v3';
+const CACHE = 'audio-note-v4';
 const ASSETS = [
   './',
   './index.html',
@@ -28,6 +28,9 @@ self.addEventListener('fetch', (e) => {
 
   // Groq API (transcription / chat) must always hit the network: never cache it.
   if (url.hostname === 'api.groq.com' || url.hostname.endsWith('.groq.com')) return;
+
+  // ffmpeg (ffmpeg/, ~32 MB wasm) is NOT precached on install; it is fetched on
+  // first use and then kept by the runtime cache below.
 
   // Anything else off-origin (audio blobs, downloads) passes straight through.
   if (req.method !== 'GET' || url.origin !== location.origin) return;
