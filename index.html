@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#f5f6f8" />
+  <title>apps</title>
+  <link rel="icon" href="./audio-note/icon-192.png" />
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f5f6f8;
+      --surface: #ffffff;
+      --surface-2: #fafbfc;
+      --text: #17181b;
+      --muted: #6b7280;
+      --line: #e6e7eb;
+      --line-strong: #d6d8dd;
+      --accent: #2563eb;
+      --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 10px 28px -20px rgba(16, 24, 40, 0.45);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0e1013;
+        --surface: #16181d;
+        --surface-2: #1b1e24;
+        --text: #f1f2f4;
+        --muted: #9aa1ab;
+        --line: #262a31;
+        --line-strong: #363b45;
+        --accent: #3b82f6;
+        --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 34px -22px rgba(0, 0, 0, 0.9);
+      }
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100dvh;
+    }
+    .page { max-width: 720px; margin: 0 auto; padding: 56px 20px 72px; }
+    header { margin-bottom: 22px; }
+    h1 {
+      margin: 0 0 6px;
+      font-size: 21px;
+      font-weight: 650;
+      letter-spacing: -0.01em;
+    }
+    header p { margin: 0; font-size: 13.5px; color: var(--muted); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+      margin-top: 26px;
+    }
+    a.card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--surface);
+      color: inherit;
+      text-decoration: none;
+      box-shadow: var(--shadow);
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+    a.card:hover { border-color: var(--line-strong); background: var(--surface-2); }
+    a.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    a.card img { width: 46px; height: 46px; flex: none; border-radius: 12px; }
+    .meta { min-width: 0; flex: 1; }
+    .name { font-size: 14.5px; font-weight: 650; }
+    .desc { margin-top: 3px; font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+    .arrow {
+      flex: none;
+      width: 18px; height: 18px;
+      stroke: var(--muted); stroke-width: 1.75; fill: none;
+      stroke-linecap: round; stroke-linejoin: round;
+    }
+    footer { margin-top: 30px; font-size: 12px; color: var(--muted); }
+    footer a { color: inherit; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>apps</h1>
+      <p>Small web apps that run in the browser and install as PWAs.</p>
+    </header>
+
+    <main class="grid">
+      <a class="card" href="./audio-note/">
+        <img src="./audio-note/icon-192.png" alt="" width="46" height="46" />
+        <div class="meta">
+          <div class="name">audio note</div>
+          <div class="desc">Free audio transcription &amp; summaries via Groq free API</div>
+        </div>
+        <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M9 5l7 7-7 7"></path>
+        </svg>
+      </a>
+
+      <a class="card" href="./clean-pdf/">
+        <img src="./clean-pdf/icon-192.png" alt="" width="46" height="46" />
+        <div class="meta">
+          <div class="name">clean pdf</div>
+          <div class="desc">Ad-free PDF viewer that opens files on your device only</div>
+        </div>
+        <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M9 5l7 7-7 7"></path>
+        </svg>
+      </a>
+    </main>
+
+    <footer>
+      <a href="https://github.com/jeonghyoan/apps">Source on GitHub</a>
+    </footer>
+  </div>
+</body>
+</html>
